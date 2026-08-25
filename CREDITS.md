@@ -4,11 +4,11 @@ GameHelper is an **open-source fork** for Path of Exile 2, based on the [GameHel
 
 | What | Where |
 |------|--------|
-| **Source code** | https://github.com/MordWraith/Gamehelper (`main` branch) |
-| **Pre-built releases** | https://github.com/MordWraith/Gamehelper/releases |
+| **Source code** | https://github.com/WAY29/Gamehelper (`main` branch) |
+| **Pre-built releases** | https://github.com/WAY29/Gamehelper/releases |
 | **Trust / auto-update** | [SECURITY.md](SECURITY.md) |
 
-**Maintainer:** [MordWraith](https://github.com/MordWraith)
+**Maintainer:** [WAY29](https://github.com/WAY29) (fork of [MordWraith/Gamehelper](https://github.com/MordWraith/Gamehelper))
 
 If someone is missing from this list, please open an issue or contact the maintainer.
 
@@ -24,7 +24,7 @@ Open **Plugins** in the GameHelper menu (top bar). The plugin table shows each p
 | GameHelper2 base | [Gordin](https://github.com/MordWraith/Gamehelper) and community | Overlay architecture, offsets, plugin host |
 | GameHelper (original) | GameHelper (OwnedCore) | Early PoE helper lineage |
 | Community maintainers | KronosDesign, arsenic2k, abevol, mm3141, others | GameHelper2 contributions |
-| This fork | MordWraith | PoE2 updates, launcher, signed auto-update, plugins, publish pipeline |
+| This fork | WAY29 | PoE2 updates, launcher, signed auto-update, plugins, publish pipeline |
 
 ## Bundled plugins
 

@@ -2,17 +2,17 @@
 
 GameHelper is a Windows x64 .NET overlay for **Path of Exile 2** with a plugin architecture. The launcher (`GameHelper.exe`) checks for updates, starts the overlay (`GameHelper.App.exe`), reads data from the running game process, and loads plugins from the `Plugins` folder.
 
-**Open-source fork maintained by** [MordWraith](https://github.com/MordWraith) — basis **Lafko / Gordin** ([GameHelper2](https://github.com/MordWraith/Gamehelper)).
+**Open-source fork maintained by** [WAY29](https://github.com/WAY29) — based on [MordWraith/Gamehelper](https://github.com/MordWraith/Gamehelper) (Lafko / Gordin GameHelper2).
 
 ## Source + binaries (same project)
 
 | Channel | For whom | Link |
 |---------|----------|------|
-| **`main` branch** | Developers, auditors, no-auto-update users | https://github.com/MordWraith/Gamehelper |
-| **Releases** | Players (installer / ZIP) | https://github.com/MordWraith/Gamehelper/releases |
+| **`main` branch** | Developers, auditors, no-auto-update users | https://github.com/WAY29/Gamehelper |
+| **Releases** | Players (installer / ZIP) | https://github.com/WAY29/Gamehelper/releases |
 | **Auto-update** | Optional convenience (signed ZIP from Releases) | Built into `GameHelper.exe` |
 
-- **Do not want auto-update?** Use the [full ZIP](https://github.com/MordWraith/Gamehelper/releases/latest) or [build from source](#build-from-source).
+- **Do not want auto-update?** Use the [full ZIP](https://github.com/WAY29/Gamehelper/releases/latest) or [build from source](#build-from-source).
 - **Trust / security:** [SECURITY.md](SECURITY.md) — signed manifests, what gets updated, what stays local.
 - **Windows Defender blocked GameHelper?** See [SECURITY.md → false positives](SECURITY.md#windows-defender-and-antivirus-false-positives) — common with auto-update and unsigned DLLs; usually not a real trojan.
 - **Attribution:** [CREDITS.md](CREDITS.md) and in-app **Plugins → Author** column.
@@ -21,9 +21,9 @@ GameHelper is a Windows x64 .NET overlay for **Path of Exile 2** with a plugin a
 
 | What | Link |
 |------|------|
-| **Installer (recommended)** | https://github.com/MordWraith/Gamehelper/releases/latest/download/GameHelperDownloader.exe |
-| Full ZIP (manual install) | https://github.com/MordWraith/Gamehelper/releases/latest/download/GameHelper-*-full.zip |
-| All releases | https://github.com/MordWraith/Gamehelper/releases/latest |
+| **Installer (recommended)** | https://github.com/WAY29/Gamehelper/releases/latest/download/GameHelperDownloader.exe |
+| Full ZIP (manual install) | https://github.com/WAY29/Gamehelper/releases/latest/download/GameHelper-*-full.zip |
+| All releases | https://github.com/WAY29/Gamehelper/releases/latest |
 
 Run `GameHelperDownloader.exe` in an **empty folder**. Requires [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
 
@@ -46,7 +46,7 @@ User settings (`configs/`, `Plugins/*/config/`) are **not** included in update p
 - [.NET 10 SDK for Windows x64](https://dotnet.microsoft.com/download/dotnet/10.0)
 
 ```powershell
-git clone https://github.com/MordWraith/Gamehelper
+git clone https://github.com/WAY29/Gamehelper
 cd Gamehelper
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
@@ -116,9 +116,10 @@ Plugins\<Name>\config\
 
 **Overlay does not attach** — Match admin elevation with the game.
 
-**Windows Defender / helper won't start** — Open Protection history, allow blocked `GameHelper` / `GameHelperUpdate` entries, or install from the [full ZIP](https://github.com/MordWraith/Gamehelper/releases/latest) into a new folder. Details: [SECURITY.md](SECURITY.md#windows-defender-and-antivirus-false-positives).
+**Windows Defender / helper won't start** — Open Protection history, allow blocked `GameHelper` / `GameHelperUpdate` entries, or install from the [full ZIP](https://github.com/WAY29/Gamehelper/releases/latest) into a new folder. Details: [SECURITY.md](SECURITY.md#windows-defender-and-antivirus-false-positives).
 
 ## Links
 
-- [Upstream GameHelper2](https://github.com/MordWraith/Gamehelper)
+- [This fork](https://github.com/WAY29/Gamehelper)
+- [Upstream MordWraith/Gamehelper](https://github.com/WAY29/Gamehelper)
 - [.NET 10 downloads](https://dotnet.microsoft.com/download/dotnet/10.0)

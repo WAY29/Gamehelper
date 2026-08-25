@@ -2,7 +2,7 @@
 param(
     [string]$Version,
     [string[]]$Changelog,
-    [string]$Repository = "MordWraith/Gamehelper",
+    [string]$Repository = "WAY29/Gamehelper",
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release",
     [switch]$SkipBuild,

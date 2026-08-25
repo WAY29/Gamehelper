@@ -6,8 +6,8 @@ This document explains how installs and updates work, so you can decide whether 
 
 | Channel | What you get |
 |---------|----------------|
-| [GitHub `main`](https://github.com/MordWraith/Gamehelper/tree/main) | Full source (clone or download ZIP) |
-| [GitHub Releases](https://github.com/MordWraith/Gamehelper/releases) | Pre-built binaries (`GameHelperDownloader.exe`, full ZIP) |
+| [GitHub `main`](https://github.com/WAY29/Gamehelper/tree/main) | Full source (clone or download ZIP) |
+| [GitHub Releases](https://github.com/WAY29/Gamehelper/releases) | Pre-built binaries (`GameHelperDownloader.exe`, full ZIP) |
 | In-app auto-update | Same signed release ZIP as on GitHub Releases |
 
 You do **not** have to use auto-update. Manual install from the full ZIP or a self-built `publish\` folder works the same.
@@ -27,7 +27,7 @@ You still trust the **maintainer** who signs releases — the same trust model a
 ## Build from source (maximum control)
 
 ```powershell
-git clone https://github.com/MordWraith/Gamehelper.git
+git clone https://github.com/WAY29/Gamehelper.git
 cd Gamehelper
 powershell -ExecutionPolicy Bypass -File scripts\build.ps1
 ```
@@ -52,7 +52,7 @@ Other vendors may use different names for the same behavior.
 1. Defender **blocked** `GameHelper.exe`, `GameHelper.App.dll`, `cmd.exe`, or a `GameHelperUpdate` entry.
 2. Open **Windows Security → Protection history**, find the block, then **Allow** / **Restore**, or add a **folder exclusion** for your GameHelper install path.
 3. Do **not** mix files from different versions (e.g. old `GameHelper.App.dll` with a new launcher).
-4. **Clean install:** download the [full ZIP](https://github.com/MordWraith/Gamehelper/releases/latest), extract to a **new empty folder**, run `GameHelper.exe`.
+4. **Clean install:** download the [full ZIP](https://github.com/WAY29/Gamehelper/releases/latest), extract to a **new empty folder**, run `GameHelper.exe`.
 
 You do **not** need to read source code to fix a block — use Protection history or a manual ZIP install.
 
@@ -74,6 +74,6 @@ You still trust whoever holds the signing key — the same model as any pre-buil
 
 ## Reporting issues
 
-Security or trust concerns: [GitHub Issues](https://github.com/MordWraith/Gamehelper/issues) (no DMs required).
+Security or trust concerns: [GitHub Issues](https://github.com/WAY29/Gamehelper/issues) (no DMs required).
 
 Please include version (`VERSION.txt`), install method (downloader / ZIP / self-built), and whether auto-update was used.
