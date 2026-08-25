@@ -53,7 +53,11 @@ namespace LootValue
         private MethodInfo? readStdWStringStructMethod;
         private MethodInfo? readStdWStringMethod;
         private MethodInfo? readIntPtrMethod;
-        private readonly HashSet<string> groundTagNames = new(StringComparer.OrdinalIgnoreCase);
+        // Localized (or English unique) loot-label text → unit chaos. Priced from the live entity
+        // via Path/art so CJK UI names do not have to match the English price DB.
+        private readonly Dictionary<string, double> groundTagUnitChaos = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, double> pricedDisplayNames = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> matchedLootTagNames = new(StringComparer.OrdinalIgnoreCase);
         private SlotScanReport leftSlotReport = new(IntPtr.Zero);
         private SlotScanReport rightSlotReport = new(IntPtr.Zero);
         private List<SlotInfo> cachedLeftSlots = new();
@@ -69,6 +73,7 @@ namespace LootValue
         /// <inheritdoc/>
         public override void OnEnable(bool isGameOpened)
         {
+            ItemLocalization.Load(this.DllDirectory);
             var shouldMigrateStashSettings = true;
             if (File.Exists(this.SettingPathname))
             {
@@ -141,7 +146,9 @@ namespace LootValue
             this.readStdWStringStructMethod = null;
             this.readStdWStringMethod = null;
             this.readIntPtrMethod = null;
-            this.groundTagNames.Clear();
+            this.groundTagUnitChaos.Clear();
+            this.pricedDisplayNames.Clear();
+            this.matchedLootTagNames.Clear();
             this.cachedLeftSlots.Clear();
             this.cachedRightSlots.Clear();
             this.cachedLeftPanelAddress = IntPtr.Zero;
@@ -266,9 +273,11 @@ namespace LootValue
                     {
                         this.nextTagScanUtc = now.AddMilliseconds(Math.Max(16, this.Settings.RescanIntervalMs));
                         this.ScanLootTags();
+                        this.RecomputeLabels(onlyUnmatchedTags: true);
                     }
 
                     this.DrawTagChips();
+                    this.DrawLabels();
                 }
             }
             else if (this.Settings.ShowOverlay)
@@ -294,7 +303,7 @@ namespace LootValue
         }
 
         /// <summary>Re-reads + reprices every ground item; throttled. The drawn position is updated live each frame.</summary>
-        private void RecomputeLabels()
+        private void RecomputeLabels(bool onlyUnmatchedTags = false)
         {
             this.cachedLabels.Clear();
 
@@ -308,6 +317,12 @@ namespace LootValue
 
                 var item = ReadFreshItem(worldItem.ItemEntityAddress);
                 if (item == null) continue;
+
+                if (onlyUnmatchedTags)
+                {
+                    if (!this.TryGetItemUnitPrice(item, out _, out var resolvedName, out var baseName)) continue;
+                    if (this.LootTagAlreadyShown(resolvedName, baseName)) continue;
+                }
 
                 if (!this.TryPriceItem(item, out var valueEx, out var label)) continue;
                 if (valueEx < this.Settings.MinValueEx) continue;
@@ -416,6 +431,7 @@ namespace LootValue
         private void ScanLootTags()
         {
             this.cachedTagChips.Clear();
+            this.matchedLootTagNames.Clear();
             this.RefreshGroundTagNames();
             var gameUi = Core.States.InGameStateObject.GameUi;
             var root = gameUi.Address;
@@ -442,9 +458,8 @@ namespace LootValue
                 }
 
                 var text = this.ReadUiElementText(el);
-                if (text.Length < 3) continue;
                 var firstLine = text.Split('\n')[0].Trim();
-                if (firstLine.Length < 3) continue;
+                if (firstLine.Length == 0) continue;
 
                 if (this.TryPriceTagText(firstLine, out var chipText, out var color, out var highlight))
                 {
@@ -461,29 +476,29 @@ namespace LootValue
             }
         }
 
+        private bool LootTagAlreadyShown(string resolvedName, string baseName)
+        {
+            if (this.matchedLootTagNames.Contains(baseName) || this.matchedLootTagNames.Contains(resolvedName))
+                return true;
+            foreach (var n in ItemLocalization.NamesFor(resolvedName, baseName))
+            {
+                if (this.matchedLootTagNames.Contains(n)) return true;
+            }
+
+            return false;
+        }
+
         private bool TryPriceTagText(string text, out string chipText, out uint color, out bool highlight)
         {
             chipText = string.Empty;
             color = 0;
             highlight = false;
 
-            var count = 1;
-            var name = text;
-            var m = Regex.Match(text, @"^(\d+)\s*x\s+(.+)$", RegexOptions.IgnoreCase);
-            if (m.Success)
-            {
-                int.TryParse(m.Groups[1].Value, out count);
-                name = m.Groups[2].Value;
-            }
+            if (!TryParseLootTag(text, out var count, out var name)) return false;
+            if (!this.groundTagUnitChaos.TryGetValue(name, out var unitChaos) || unitChaos <= 0) return false;
+            this.matchedLootTagNames.Add(name);
 
-            name = name.Trim();
-            if (name.Length < 3) return false;
-            if (!this.groundTagNames.Contains(name)) return false;
-
-            var price = PoeNinjaPriceFetcher.GetPrice(name);
-            if (price == null) return false;
-
-            var priced = new PoeNinjaPrice { PriceChaos = price.PriceChaos * Math.Max(1, count) };
+            var priced = new PoeNinjaPrice { PriceChaos = unitChaos * count };
             var (exVal, _) = PoeNinjaPriceFetcher.GetDisplayPrice(priced, 1);
             if (exVal < this.Settings.MinValueEx) return false;
 
@@ -549,31 +564,62 @@ namespace LootValue
         /// </summary>
         private void RefreshGroundTagNames()
         {
-            this.groundTagNames.Clear();
+            this.groundTagUnitChaos.Clear();
             var area = Core.States.InGameStateObject.CurrentAreaInstance;
             foreach (var entity in area.AwakeEntities.Values)
             {
                 if (!entity.TryGetComponent<WorldItem>(out var worldItem) || worldItem.ItemEntityAddress == IntPtr.Zero) continue;
                 var item = ReadFreshItem(worldItem.ItemEntityAddress);
                 if (item == null) continue;
+                if (!this.TryGetItemUnitPrice(item, out var price, out var resolvedName, out var baseName)) continue;
 
-                if (item.TryGetComponent<Base>(out var baseComp) && !string.IsNullOrWhiteSpace(baseComp.BaseItemName))
-                {
-                    this.groundTagNames.Add(baseComp.BaseItemName.Trim());
-                }
-
-                if (!item.TryGetComponent<Mods>(out var mods) || mods.Rarity != Rarity.Unique ||
-                    !item.TryGetComponent<RenderItem>(out var renderItem)) continue;
-
-                foreach (var key in ArtKeyVariants(ExtractArtBasename(renderItem.ResourcePath)))
-                {
-                    if (PoeNinjaPriceFetcher.TryResolveDisplayName(key, out var uniqueName) &&
-                        !PoeNinjaPriceFetcher.IsGenericLookupName(uniqueName))
-                    {
-                        this.groundTagNames.Add(uniqueName.Trim());
-                    }
-                }
+                foreach (var n in ItemLocalization.NamesFor(resolvedName, baseName))
+                    this.AddGroundTagName(n, price.PriceChaos);
             }
+        }
+
+        private void AddGroundTagName(string? name, double unitChaos)
+        {
+            if (string.IsNullOrWhiteSpace(name) || unitChaos <= 0) return;
+            this.groundTagUnitChaos[name.Trim()] = unitChaos;
+        }
+
+        // "12x Chaos Orb", "12x混沌石", "12×混沌石".
+        internal static bool TryParseLootTag(string text, out int count, out string name)
+        {
+            count = 1;
+            name = string.Empty;
+            if (string.IsNullOrWhiteSpace(text)) return false;
+
+            var m = Regex.Match(text, @"^(\d+)\s*[x×X]\s*(.+)$");
+            if (m.Success)
+            {
+                if (!int.TryParse(m.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out count))
+                    count = 1;
+                name = m.Groups[2].Value.Trim();
+            }
+            else
+            {
+                name = text.Trim();
+            }
+
+            if (count < 1) count = 1;
+            return name.Length > 0;
+        }
+
+        static LootValueCore()
+        {
+            // ponytail: parser self-check, drop if this class grows a real test project
+            ExpectTag("12x Chaos Orb", 12, "Chaos Orb");
+            ExpectTag("12x混沌石", 12, "混沌石");
+            ExpectTag("12×混沌石", 12, "混沌石");
+            ExpectTag("混沌石", 1, "混沌石");
+        }
+
+        private static void ExpectTag(string text, int count, string name)
+        {
+            if (!TryParseLootTag(text, out var c, out var n) || c != count || n != name)
+                throw new InvalidOperationException($"LootValue tag parse failed: '{text}'");
         }
 
         /// <summary>Draws cached owned-stack values in the Currency Exchange item browser.</summary>
@@ -608,7 +654,10 @@ namespace LootValue
         private void ScanCurrencyExchange()
         {
             this.cachedExchangeLabels.Clear();
-            var root = this.ResolveUiPath(Core.States.InGameStateObject.GameUi.Address, CurrencyExchangeRootPath);
+            var gameUi = Core.States.InGameStateObject.GameUi;
+            if (gameUi.LeftPanel.IsVisible) this.HarvestPricedNames(gameUi.LeftPanel.Address);
+            if (gameUi.RightPanel.IsVisible) this.HarvestPricedNames(gameUi.RightPanel.Address);
+            var root = this.ResolveUiPath(gameUi.Address, CurrencyExchangeRootPath);
             if (root == IntPtr.Zero || !this.TryGetVisibleChildren(root, out var rootChildren) || rootChildren.Length <= 1) return;
 
             // [114][20][6][1] is the complete item list. Its visibility is the reliable signal that
@@ -637,7 +686,7 @@ namespace LootValue
 
                         var name = this.ReadUiElementText(nameAddress).Split('\n')[0].Trim();
                         var amountText = this.ReadUiElementText(iconChildren[0]);
-                        if (name.Length < 2 || !TryParseOwnedAmount(amountText, out var amount) || amount <= 0) continue;
+                        if (name.Length == 0 || !TryParseOwnedAmount(amountText, out var amount) || amount <= 0) continue;
                         if (!this.TryPriceNamedStack(name, amount, out var text, out var color, out var highlight)) continue;
                         if (!PluginUiElementReflection.TryGetAbsoluteRect(iconAddress, out var iconPosition, out var iconSize)) continue;
 
@@ -692,6 +741,35 @@ namespace LootValue
             return digits.Length > 0 && long.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out amount);
         }
 
+        private void HarvestPricedNames(IntPtr panelAddress)
+        {
+            if (panelAddress == IntPtr.Zero || this.readUiOffsetMethod == null ||
+                this.readStdVectorMethod == null || this.readIntPtrMethod == null) return;
+
+            var queue = new Queue<IntPtr>();
+            var visited = new HashSet<IntPtr>();
+            queue.Enqueue(panelAddress);
+            while (queue.Count > 0 && visited.Count < 5000)
+            {
+                var el = queue.Dequeue();
+                if (el == IntPtr.Zero || !visited.Add(el)) continue;
+                if (this.readUiOffsetMethod.Invoke(this.handleObj, new object[] { el }) is not UiElementBaseOffset off) continue;
+                if (el != panelAddress && !UiElementBaseFuncs.IsVisibleChecker(off.Flags)) continue;
+                if (this.readStdVectorMethod.Invoke(this.handleObj, new object[] { off.ChildrensPtr }) is IntPtr[] kids)
+                {
+                    foreach (var k in kids) queue.Enqueue(k);
+                }
+
+                var pointerValue = this.readIntPtrMethod.Invoke(this.handleObj, new object[] { el + UiElementItemAddressOffset });
+                var itemAddress = pointerValue is IntPtr pointer ? pointer : IntPtr.Zero;
+                if (itemAddress == IntPtr.Zero) continue;
+                if (!PluginUiElementReflection.TryValidateItemAddress(itemAddress, out _, out _)) continue;
+                var item = ReadFreshItem(itemAddress);
+                if (item == null) continue;
+                this.TryGetItemUnitPrice(item, out _, out _, out _);
+            }
+        }
+
         private bool TryPriceNamedStack(
             string itemName,
             long amount,
@@ -702,10 +780,19 @@ namespace LootValue
             text = string.Empty;
             color = 0;
             highlight = false;
-            var price = PoeNinjaPriceFetcher.GetPrice(itemName);
-            if (price == null) return false;
+            var lookup = ItemLocalization.ResolveEnglish(itemName);
+            if (!this.pricedDisplayNames.TryGetValue(itemName, out var unitChaos) || unitChaos <= 0)
+            {
+                if (string.Equals(lookup, itemName, StringComparison.OrdinalIgnoreCase) ||
+                    !this.pricedDisplayNames.TryGetValue(lookup, out unitChaos) || unitChaos <= 0)
+                {
+                    var price = PoeNinjaPriceFetcher.GetPrice(lookup);
+                    if (price == null) return false;
+                    unitChaos = price.PriceChaos;
+                }
+            }
 
-            var priced = new PoeNinjaPrice { PriceChaos = price.PriceChaos * amount };
+            var priced = new PoeNinjaPrice { PriceChaos = unitChaos * amount };
             var (exValue, _) = PoeNinjaPriceFetcher.GetDisplayPrice(priced, 1);
             if (exValue < this.Settings.MinValueEx) return false;
 
@@ -1159,9 +1246,6 @@ namespace LootValue
                 if (item == null) continue;
                 innerOk++;
 
-                var rarity = item.TryGetComponent<Mods>(out var m) ? m.Rarity : Rarity.Normal;
-                var baseName = item.TryGetComponent<Base>(out var b) ? b.BaseItemName : string.Empty;
-                var art = item.TryGetComponent<RenderItem>(out var ri) ? ExtractArtBasename(ri.ResourcePath) : string.Empty;
                 var ok = this.TryPriceItem(item, out var ex, out var lbl);
                 if (ok)
                 {
@@ -1170,20 +1254,47 @@ namespace LootValue
                 }
 
                 if (this.diagSamples.Count < 20)
-                {
-                    this.diagSamples.Add(ok
-                        ? $"{rarity} {baseName} [art={art}] -> {lbl} ({ex:0.##} ex)"
-                        : $"{rarity} {baseName} [art={art}] -> {this.PluginText.T("diagnostics.no_price", "NO PRICE")}");
-                }
+                    this.diagSamples.Add(FormatItemDiag(item, ok, ex, lbl));
             }
 
             this.diagSummary =
-                this.PluginText.F("diagnostics.summary.ingame", "InGame={0}  PanelOpen={1}", Core.States.GameCurrentState == GameStateTypes.InGameState, Core.States.InGameStateObject.GameUi.IsAnyLargePanelOpen) + "\n" +
-                this.PluginText.F("diagnostics.summary.awake_entities", "AwakeEntities={0}", total) + "\n" +
-                this.PluginText.F("diagnostics.summary.paths", "path contains 'WorldItem'={0}    path starts 'Metadata/Items'={1}", wiPath, metaItemsPath) + "\n" +
-                this.PluginText.F("diagnostics.summary.components", "WorldItem component (inner!=0)={0}    inner item read OK={1}", wiComp, innerOk) + "\n" +
-                this.PluginText.F("diagnostics.summary.pricing", "priced={0}    belowFloor(<{1}ex)={2}    would draw={3}", priced, this.Settings.MinValueEx, belowFloor, priced - belowFloor) + "\n" +
-                this.PluginText.F("diagnostics.summary.price_db", "priceDB items={0}  fetching={1}", PoeNinjaPriceFetcher.LoadedItemCount, PoeNinjaPriceFetcher.IsFetching);
+                $"InGame={Core.States.GameCurrentState == GameStateTypes.InGameState}  PanelOpen={Core.States.InGameStateObject.GameUi.IsAnyLargePanelOpen}\n" +
+                $"AwakeEntities={total}\n" +
+                $"WorldItem path={wiPath}    Metadata/Items path={metaItemsPath}\n" +
+                $"WorldItem component={wiComp}    inner item OK={innerOk}\n" +
+                $"priced={priced}    belowFloor(<{this.Settings.MinValueEx}ex)={belowFloor}    wouldDraw={priced - belowFloor}\n" +
+                $"priceDB={PoeNinjaPriceFetcher.LoadedItemCount}  fetching={PoeNinjaPriceFetcher.IsFetching}  i18n={ItemLocalization.Count}\n" +
+                $"i18n 完美混沌石 -> {ItemLocalization.ResolveEnglish("完美混沌石")} / 混沌石 -> {ItemLocalization.ResolveEnglish("混沌石")}\n" +
+                this.FormatHoveredDiag();
+        }
+
+        private static string FormatItemDiag(Item item, bool ok, double ex, string lbl)
+        {
+            var rarity = item.TryGetComponent<Mods>(out var m) ? m.Rarity : Rarity.Normal;
+            var baseName = item.TryGetComponent<Base>(out var b) ? b.BaseItemName : string.Empty;
+            var datId = item.TryGetComponent<Base>(out var b2) ? b2.InternalName : string.Empty;
+            var art = item.TryGetComponent<RenderItem>(out var ri) ? ExtractArtBasename(ri.ResourcePath) : string.Empty;
+            var price = ok ? $"{lbl} ({ex:0.##} ex)" : "NO PRICE";
+            return $"{rarity} {baseName} en={ItemLocalization.ResolveEnglish(baseName)} path={item.Path} dat={datId} art={art} -> {price}";
+        }
+
+        private string FormatHoveredDiag()
+        {
+            var hovered = Core.States.InGameStateObject.MouseOverEntity;
+            if (!hovered.IsValid)
+                return "hover: (none)";
+
+            Item? item = null;
+            if (hovered.TryGetComponent<WorldItem>(out var wi) && wi.ItemEntityAddress != IntPtr.Zero)
+                item = ReadFreshItem(wi.ItemEntityAddress);
+            else if (hovered.TryGetComponent<Base>(out _))
+                item = hovered as Item ?? ReadFreshItem(hovered.Address);
+
+            if (item == null)
+                return $"hover wrapper path={hovered.Path} (no item)";
+
+            var ok = this.TryPriceItem(item, out var ex, out var lbl);
+            return "hover: " + FormatItemDiag(item, ok, ex, lbl);
         }
 
         private void DrawDiagnosticsWindow()
@@ -1203,22 +1314,32 @@ namespace LootValue
             ImGui.End();
         }
 
-        /// <summary>Resolve an item's display value + label text. Uniques price by icon art (revealing
-        /// unidentified ones); everything else by base-type name. Mirrors RitualHelper's resolution.</summary>
-        private bool TryPriceItem(Item item, out double valueEx, out string label, bool includeUniqueName = true)
+        /// <summary>Unit chaos price + names. Uniques resolve by icon art; everything else by base
+        /// name + metadata path (so localized BaseItemName still prices against the English DB).</summary>
+        private bool TryGetItemUnitPrice(Item item, out PoeNinjaPrice price, out string resolvedName, out string baseName)
         {
-            valueEx = 0;
-            label = string.Empty;
-
+            price = null!;
+            resolvedName = string.Empty;
             var rarity = Rarity.Normal;
             if (item.TryGetComponent<Mods>(out var mods)) rarity = mods.Rarity;
 
-            var baseName = item.TryGetComponent<Base>(out var baseComp) ? baseComp.BaseItemName?.Trim() ?? string.Empty : string.Empty;
+            var datId = string.Empty;
+            if (item.TryGetComponent<Base>(out var baseComp))
+            {
+                baseName = baseComp.BaseItemName?.Trim() ?? string.Empty;
+                datId = baseComp.InternalName?.Trim() ?? string.Empty;
+            }
+            else
+            {
+                baseName = string.Empty;
+            }
+
             var artBasename = item.TryGetComponent<RenderItem>(out var renderItem) ? ExtractArtBasename(renderItem.ResourcePath) : string.Empty;
             var fullItemPath = item.Path ?? string.Empty;
             var internalName = fullItemPath.Contains('/') ? fullItemPath[(fullItemPath.LastIndexOf('/') + 1)..] : fullItemPath;
+            if (string.IsNullOrEmpty(internalName)) internalName = datId;
 
-            var itemName = baseName;
+            resolvedName = baseName;
             if (rarity == Rarity.Unique && !string.IsNullOrEmpty(artBasename))
             {
                 foreach (var key in ArtKeyVariants(artBasename))
@@ -1226,23 +1347,55 @@ namespace LootValue
                     if (PoeNinjaPriceFetcher.TryResolveDisplayName(key, out var uniqueName) &&
                         !PoeNinjaPriceFetcher.IsGenericLookupName(uniqueName))
                     {
-                        itemName = uniqueName;
+                        resolvedName = uniqueName;
                         break;
                     }
 
                     if (PoeNinjaPriceFetcher.HasPriceDataForName(key))
                     {
-                        itemName = key;
+                        resolvedName = key;
                         break;
                     }
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(itemName)) return false;
+            if (string.IsNullOrWhiteSpace(resolvedName))
+                resolvedName = datId;
+            if (string.IsNullOrWhiteSpace(resolvedName))
+                resolvedName = internalName;
+            resolvedName = ItemLocalization.ResolveEnglish(resolvedName);
 
-            var modLines = ItemModHelper.GetModLines(item);
-            var price = PoeNinjaPriceFetcher.GetPrice(itemName, modLines, internalName, fullItemPath);
-            if (price == null) return false;
+            var found = PoeNinjaPriceFetcher.GetPrice(
+                resolvedName,
+                ItemModHelper.GetModLines(item),
+                internalName,
+                fullItemPath,
+                string.IsNullOrEmpty(datId) ? null : datId);
+            if (found == null) return false;
+            price = found;
+
+            if (PoeNinjaPriceFetcher.TryResolveDisplayName(datId, out var mapped) ||
+                PoeNinjaPriceFetcher.TryResolveDisplayName(internalName, out mapped))
+                resolvedName = mapped;
+
+            foreach (var n in ItemLocalization.NamesFor(resolvedName, baseName))
+                this.RememberPricedName(n, price.PriceChaos);
+            return true;
+        }
+
+        private void RememberPricedName(string? name, double unitChaos)
+        {
+            if (string.IsNullOrWhiteSpace(name) || unitChaos <= 0) return;
+            this.pricedDisplayNames[name.Trim()] = unitChaos;
+        }
+
+        /// <summary>Resolve an item's display value + label text. Uniques price by icon art (revealing
+        /// unidentified ones); everything else by base-type name. Mirrors RitualHelper's resolution.</summary>
+        private bool TryPriceItem(Item item, out double valueEx, out string label, bool includeUniqueName = true)
+        {
+            valueEx = 0;
+            label = string.Empty;
+            if (!this.TryGetItemUnitPrice(item, out var price, out var itemName, out _)) return false;
 
             var stack = item.TryGetComponent<Stack>(out var stackComp) && stackComp.Count > 1 ? stackComp.Count : 1;
             var priceChaos = price.PriceChaos * stack;
@@ -1257,6 +1410,7 @@ namespace LootValue
             var valueText = FormatValue(displayValue, displayCurrency);
 
             // valueText is already the stack TOTAL; only uniques get a name prefix.
+            var rarity = item.TryGetComponent<Mods>(out var mods) ? mods.Rarity : Rarity.Normal;
             var nameForLabel = includeUniqueName && rarity == Rarity.Unique && this.Settings.RevealUnidentifiedUniques ? $"{itemName} — " : string.Empty;
             label = $"{nameForLabel}{valueText}";
             return true;

@@ -56,7 +56,7 @@ namespace LootValue
         // Bump whenever the cache shape or how the art->name index is built changes, so caches written
         // by an older plugin version are discarded instead of trusted. (v2: art index now built from
         // both poe.ninja + poe2scout icons.)
-        private const int CacheSchemaVersion = 2;
+        private const int CacheSchemaVersion = 3;
 
         private static readonly string[] ScoutCurrencyCategories =
         {
@@ -321,6 +321,10 @@ namespace LootValue
             {
                 if (string.IsNullOrWhiteSpace(value)) return;
                 var trimmed = value.Trim();
+                var english = ItemLocalization.ResolveEnglish(trimmed);
+                if (!string.Equals(english, trimmed, StringComparison.OrdinalIgnoreCase) &&
+                    !IsGenericLookupName(english) && seen.Add(english))
+                    candidates.Add(english);
                 if (IsGenericLookupName(trimmed)) return;
                 if (seen.Add(trimmed)) candidates.Add(trimmed);
             }
@@ -712,7 +716,21 @@ namespace LootValue
                         AddFlatPrice(flat, metadata?["name"]?.ToString(), price);
                         AddFlatPrice(flat, metadata?["base_type"]?.ToString(), price);
                         IndexPathName(pathNames, item["ApiId"]?.ToString(), text);
-                        IndexPathName(pathNames, ExtractIconBasename(item["IconUrl"]?.ToString()), text);
+                        // Icon is shared across chaos/greater/perfect tiers (CurrencyRerollRare.png).
+                        // Index the metadata id the game actually stores on the item.
+                        var baseTypeId = item["BaseItemTypeId"]?.ToString();
+                        if (!string.IsNullOrWhiteSpace(baseTypeId))
+                        {
+                            IndexPathName(pathNames, baseTypeId, text);
+                            AddFlatPrice(flat, baseTypeId, price);
+                            var slash = baseTypeId.LastIndexOf('/');
+                            if (slash >= 0 && slash < baseTypeId.Length - 1)
+                            {
+                                var tail = baseTypeId[(slash + 1)..];
+                                IndexPathName(pathNames, tail, text);
+                                AddFlatPrice(flat, tail, price);
+                            }
+                        }
                     }
                 }
                 catch { break; }
