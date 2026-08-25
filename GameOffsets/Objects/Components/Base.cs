@@ -12,7 +12,7 @@ namespace GameOffsets.Objects.Components
     ///     Recovered from the POE2Radar project and validated live on 2026-06-20 against a
     ///     dropped Greater Orb of Augmentation:
     ///     <list type="bullet">
-    ///         <item><c>+0x10</c> → a row whose <c>+0x30</c> is a pointer to the UTF-16 display name.</item>
+    ///         <item><c>+0x10</c> → a row whose <c>+0x30</c> is a std::wstring display name (SSO for short CJK names).</item>
     ///         <item><c>+0x18</c> → the BaseItemTypes row (<c>+0x00</c> internal id e.g.
     ///         "CurrencyAddModToMagic2", <c>+0x08</c> .dds art, <c>+0x10</c> .ao).</item>
     ///     </list>
@@ -24,13 +24,13 @@ namespace GameOffsets.Objects.Components
     {
         [FieldOffset(0x0000)] public ComponentHeader Header;
 
-        // → name row; (name row + DisplayNameOffset) is a pointer to the UTF-16 display name.
+        // → name row; (name row + DisplayNameOffset) is a std::wstring display name.
         [FieldOffset(0x0010)] public IntPtr DisplayNameRowPtr;
 
         // → BaseItemTypes row; (row + 0x00) is a pointer to the internal (metadata) base-type id.
         [FieldOffset(0x0018)] public IntPtr BaseItemTypesRowPtr;
 
-        /// <summary>Offset within <see cref="DisplayNameRowPtr" />'s row of the UTF-16 display-name pointer.</summary>
+        /// <summary>Offset within <see cref="DisplayNameRowPtr" />'s row of the std::wstring display name.</summary>
         public const int DisplayNameOffset = 0x30;
     }
 }

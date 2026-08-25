@@ -1081,6 +1081,17 @@ namespace GameHelper.Ui
                     else
                     {
                         DrawFieldTable($"card_{e.GetHashCode()}_{name}", root.Fields);
+                        if (name == "WorldItem" &&
+                            e.TryGetComponent<WorldItem>(out var worldItem, false) &&
+                            worldItem.ItemEntityAddress != IntPtr.Zero &&
+                            ImGui.SmallButton($"Pin inner item##odinner_{e.GetHashCode()}"))
+                        {
+                            var inner = new Item(worldItem.ItemEntityAddress);
+                            if (PinnedEntities.TrueForAll(p => p.Address != inner.Address))
+                            {
+                                PinnedEntities.Add(inner);
+                            }
+                        }
                     }
 
                     ImGui.TreePop();

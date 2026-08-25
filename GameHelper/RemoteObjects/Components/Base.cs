@@ -5,6 +5,7 @@
 namespace GameHelper.RemoteObjects.Components
 {
     using System;
+    using GameOffsets.Natives;
     using GameOffsets.Objects.Components;
     using ImGuiNET;
 
@@ -59,11 +60,9 @@ namespace GameHelper.RemoteObjects.Components
             this.BaseItemName = string.Empty;
             if (data.DisplayNameRowPtr != IntPtr.Zero)
             {
-                var namePtr = reader.ReadMemory<IntPtr>(data.DisplayNameRowPtr + BaseOffsets.DisplayNameOffset);
-                if (namePtr != IntPtr.Zero)
-                {
-                    this.BaseItemName = reader.ReadUnicodeString(namePtr);
-                }
+                // Name row +0x30 is a std::wstring (short names are SSO, not a UTF-16 pointer).
+                var name = reader.ReadMemory<StdWString>(data.DisplayNameRowPtr + BaseOffsets.DisplayNameOffset);
+                this.BaseItemName = reader.ReadStdWString(name);
             }
 
             this.InternalName = string.Empty;
