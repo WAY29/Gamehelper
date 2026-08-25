@@ -134,6 +134,10 @@ namespace Launcher
 
             this.MinimizeBox = false;
 
+            this.AutoScaleDimensions = new SizeF(96F, 96F);
+
+            this.AutoScaleMode = AutoScaleMode.Dpi;
+
             this.ClientSize = new Size(640, 520);
 
             this.BackColor = Bg;
@@ -150,9 +154,13 @@ namespace Launcher
 
                 Color.FromArgb(55, 58, 72),
 
-                new Point(524, 16),
+                new Point(496, 16),
 
-                new Size(92, 28));
+                new Size(120, 28));
+
+            this.languageButton.AutoSize = true;
+
+            this.languageButton.Padding = new Padding(16, 6, 16, 6);
 
             this.languageButton.Click += this.OnLanguageToggle;
 
@@ -162,11 +170,9 @@ namespace Launcher
 
             {
 
-                AutoSize = false,
+                AutoSize = true,
 
                 Location = new Point(24, 20),
-
-                Size = new Size(488, 32),
 
                 Font = new Font("Segoe UI", 14f, FontStyle.Bold),
 
@@ -182,11 +188,9 @@ namespace Launcher
 
             {
 
-                AutoSize = false,
+                AutoSize = true,
 
                 Location = new Point(24, 54),
-
-                Size = new Size(592, 22),
 
                 ForeColor = TextMuted,
 
@@ -214,11 +218,9 @@ namespace Launcher
 
             {
 
-                AutoSize = false,
+                AutoSize = true,
 
                 Location = new Point(16, 12),
-
-                Size = new Size(560, 22),
 
                 ForeColor = TextMain,
 
@@ -430,6 +432,40 @@ namespace Launcher
 
             this.FormClosing += this.OnFormClosing;
 
+            this.LayoutHeader();
+
+        }
+
+
+
+        private void LayoutHeader()
+
+        {
+
+            const int margin = 24;
+
+            this.languageButton.Location = new Point(
+
+                this.ClientSize.Width - margin - this.languageButton.Width, 16);
+
+            this.titleLabel.MaximumSize = new Size(
+
+                Math.Max(80, this.languageButton.Left - margin - 8), 0);
+
+            this.titleLabel.Location = new Point(margin, 16);
+
+            this.subtitleLabel.MaximumSize = new Size(this.ClientSize.Width - (margin * 2), 0);
+
+            this.subtitleLabel.Location = new Point(margin, this.titleLabel.Bottom + 6);
+
+            var top = Math.Max(this.subtitleLabel.Bottom, this.languageButton.Bottom) + 12;
+
+            var bottom = this.primaryButton.Top - 16;
+
+            this.contentPanel.Location = new Point(margin, top);
+
+            this.contentPanel.Height = Math.Max(120, bottom - top);
+
         }
 
 
@@ -640,6 +676,8 @@ namespace Launcher
 
             this.languageButton.Text = LauncherLocalization.LanguageToggleLabel;
 
+            this.LayoutHeader();
+
             this.RefreshLocalizedUi();
 
         }
@@ -730,6 +768,8 @@ namespace Launcher
         private async void OnFormLoad(object? sender, EventArgs e)
 
         {
+
+            this.LayoutHeader();
 
             await this.RunUpdateFlowAsync();
 
