@@ -1,292 +1,299 @@
-﻿{
-    "releases":  [
-                     {
-                         "version":  "1.4.11",
-                         "published":  "2026-08-07T05:12:49.6568700Z",
-                         "changelog":  [
-                                           "Gordin Sync"
-                                       ]
-                     },
-                     {
-                         "version":  "1.4.10",
-                         "published":  "2026-07-28T15:16:37.2883574Z",
-                         "changelog":  [
-                                           "Gordin Merge"
-                                       ]
-                     },
-                     {
-                         "version":  "1.4.9",
-                         "published":  "2026-07-22T15:18:37.2886880Z",
-                         "changelog":  [
-                                           "Gordin Sync"
-                                       ]
-                     },
-                     {
-                         "version":  "1.4.8",
-                         "published":  "2026-07-17T13:25:49.2293818Z",
-                         "changelog":  [
-                                           "Gordin Sync (New offsets)"
-                                       ]
-                     },
-                     {
-                         "version":  "1.4.7",
-                         "published":  "2026-07-14T14:55:08.6995944Z",
-                         "changelog":  [
-                                           "x"
-                                       ]
-                     },
-                     {
-                         "version":  "1.4.6",
-                         "published":  "2026-07-07T14:32:49.4336390Z",
-                         "changelog":  [
-                                           "New: PickupHelper (Gordin)",
-                                           "Atlas: 0.3.0 (yokkenUA)"
-                                       ]
-                     },
-                     {
-                         "version":  "1.4.5",
-                         "published":  "2026-07-05T04:46:46.1503054Z",
-                         "changelog":  [
-                                           "Update: RuneCrafthelper",
-                                           "Gordin Merge for localization",
-                                           "RunecraftHelper/ Atlas / SekhemaHelper / Atlas: UI localization  11 languages",
-                                           "RunecraftHelper:   Expedition planner fixes"
-                                       ]
-                     },
-                     {
-                         "version":  "1.4.4",
-                         "published":  "2026-07-02T15:06:45.3658571Z",
-                         "changelog":  [
-                                           "[Fix] hides Radar/Health Bars correctly when Atlas skill tree is opened (Gordin)",
-                                           "New: StashUtility (Tenchi)"
-                                       ]
-                     },
-                     {
-                         "version":  "1.4.3",
-                         "published":  "2026-06-29T16:36:39.1970826Z",
-                         "changelog":  [
-                                           "Atlas: Sea node content detection fixed; Overlapping routes stay readable",
-                                           "Controller support for Autopot (NicoFasho)",
-                                           "New Offsets by Immo",
-                                           "New:  LootTracker: Big quality-of-life drop for LootTracker (yokkenUA)"
-                                       ]
-                     },
-                     {
-                         "version":  "1.4.2",
-                         "published":  "2026-06-26T12:18:26.0552997Z",
-                         "changelog":  [
-                                           "Gordin core 2.4.2: MouseOverEntity, Expedition Radar icons",
-                                           "New: fixed overlay price issue on non-english game clients by yokkenUA"
-                                       ]
-                     },
-                     {
-                         "version":  "1.4.1",
-                         "published":  "2026-06-25T13:36:32.6995509Z",
-                         "changelog":  [
-                                           "Fix offsets + RunecraftHelper v0.1.3"
-                                       ]
-                     },
-                     {
-                         "version":  "1.4.0",
-                         "published":  "2026-06-25T13:28:39.7777663Z",
-                         "changelog":  [
-                                           "New Ofset thx to Chunn"
-                                       ]
-                     },
-                     {
-                         "version":  "1.3.14",
-                         "published":  "2026-06-23T21:22:05.5287565Z",
-                         "changelog":  [
-                                           "[Plugin] LootValue from Gordin"
-                                       ]
-                     },
-                     {
-                         "version":  "1.3.13",
-                         "published":  "2026-06-21T18:55:57.9094385Z",
-                         "changelog":  [
-                                           "[update] - RitualHelper: instant pricing without Ctrl+C (Thx Gordin, Sikaka) || [update] - RitualHelper: Sofort-Preise ohne Ctrl+C (Thx Gordin, Sikaka)",
-                                           "[update] - RuneforgeHelper: ninja stash art index and improved price cache || [update] - RuneforgeHelper: Ninja-Stash-Art-Index und verbesserter Preis-Cache"
-                                       ]
-                     },
-                     {
-                         "version":  "1.3.10",
-                         "published":  "2026-06-20T15:34:50.2171346Z",
-                         "changelog":  [
-                                           "[Fix] - AHK double klick (Thx to Gordin for Help)"
-                                       ]
-                     },
-                     {
-                         "version":  "1.3.9",
-                         "published":  "2026-06-20T12:43:03.5439851Z",
-                         "changelog":  [
-                                           "Version 1.3.9 release || Version 1.3.9 Release"
-                                       ]
-                     },
-                     {
-                         "version":  "1.3.8",
-                         "published":  "2026-06-20T09:22:37.1769914Z",
-                         "changelog":  [
-                                           "[Hiveblood 1.0.1] Throttled UI scans to reduce CPU usage || [Hiveblood 1.0.1] UI-Scans gedrosselt (weniger CPU)"
-                                       ]
-                     },
-                     {
-                         "version":  "1.3.7",
-                         "published":  "2026-06-20T01:37:57.1924948Z",
-                         "changelog":  [
-                                           "[New Plugin] - Hiveblood",
-                                           "[New Plugin] - FarmTracker"
-                                       ]
-                     },
-                     {
-                         "version":  "1.3.6",
-                         "published":  "2026-06-19T16:29:09.4700704Z",
-                         "changelog":  [
-                                           "[Plugin] SekhemaHelper: smarter affliction weights from your defensive stats — synced from yokkenUA v0.0.2 (original by Nekkoy) || [Plugin] SekhemaHelper: Affliction-Gewichte nach deinen Defensivwerten — Update von yokkenUA v0.0.2 (Original von Nekkoy)",
-                                           "[Plugin] RuneforgeHelper: recipe catalog updated for PoE2 0.5.3 HF3 — data from yokkenUA RunecraftHelper v0.1.1 (original by Nekkoy) || [Plugin] RuneforgeHelper: Rezeptkatalog für PoE2 0.5.3 HF3 — Daten von yokkenUA RunecraftHelper v0.1.1 (Original von Nekkoy)"
-                                       ]
-                     },
-                     {
-                         "version":  "1.3.5",
-                         "published":  "2026-06-19T12:40:05.5009653Z",
-                         "changelog":  [
-                                           "Version 1.3.5 release || Version 1.3.5 Release"
-                                       ]
-                     },
-                     {
-                         "version":  "1.3.4",
-                         "published":  "2026-06-17T14:35:18.0654447Z",
-                         "changelog":  [
-                                           "RuneforgeHelper: Monolith reward window + map value labels (YokkenUA)|| RuneforgeHelper: Monolith-Belohnungsfenster + Werte auf der Karte (YokkenUA)"
-                                       ]
-                     },
-                     {
-                         "version":  "1.3.3",
-                         "published":  "2026-06-16T13:37:06.0508171Z",
-                         "changelog":  [
-                                           "[Plugin] Radar: Abyss + Breach updates, correct runestone socket counts, hide labels when near || [Plugin] Radar: Abyss + Breach, korrekte Runenstein-Sockets, Zahlen in der Nähe ausblenden",
-                                           "[Info] If Radar icons look wrong after updating, delete Plugins/Radar/config/settings.txt once and restart || [Info] Wenn Radar-Icons nach dem Update falsch aussehen: einmal Plugins/Radar/config/settings.txt löschen und neu starten"
-                                       ]
-                     },
-                     {
-                         "version":  "1.3.2",
-                         "published":  "2026-06-14T15:55:33.0884532Z",
-                         "changelog":  [
-                                           "Version 1.3.2 release || Version 1.3.2 Release"
-                                       ]
-                     },
-                     {
-                         "version":  "1.3.1",
-                         "published":  "2026-06-13T14:54:42.8848906Z",
-                         "changelog":  [
-                                           "Version 1.3.1 release || Version 1.3.1 Release"
-                                       ]
-                     },
-                     {
-                         "version":  "1.3.0",
-                         "published":  "2026-06-12T12:07:52.6181669Z",
-                         "changelog":  [
-                                           "[New] Full source code is on GitHub (main branch) — build, audit, or skip auto-update anytime: https://github.com/MordWraith/Gamehelper || [Neu] Vollständiger Quellcode auf GitHub (main) — bauen, prüfen oder Auto-Update umgehen: https://github.com/MordWraith/Gamehelper",
-                                           "[New] Trust docs: signed ZIP updates, your configs/plugin settings are never overwritten — see SECURITY.md on GitHub || [Neu] Vertrauen: signierte ZIP-Updates, configs/Plugin-Einstellungen werden nie überschrieben — siehe SECURITY.md auf GitHub",
-                                           "[Fix] PlayerBuffBar: custom buff watchlist no longer resets to defaults on every startup || [Fix] PlayerBuffBar: eigene Buff-Watchlist wird beim Start nicht mehr auf Standard zurückgesetzt",
-                                           "[Plugin] PlayerBuffBar: Power / Frenzy / Endurance charges use in-game icons (poe2db) instead of P/E/F letters || [Plugin] PlayerBuffBar: Power-/Frenzy-/Endurance-Charges nutzen Ingame-Icons (poe2db) statt P/E/F",
-                                           "[Fix] Radar: boss arena path list reset fix — use Show Paths to Icons if boss markers look wrong after a bad auto-scan || [Fix] Radar: Boss-Arena-Pfadliste repariert — bei falschen Boss-Markern Show Paths to Icons nutzen",
-                                           "[Plugin] MapKillCounter: compact N/M/R/U rarity labels (language-independent) || [Plugin] MapKillCounter: kompakte N/M/R/U-Seltenheits-Labels (sprachunabhängig)"
-                                       ]
-                     },
-                     {
-                         "version":  "1.2.5",
-                         "published":  "2026-06-12T11:44:19.2655837Z",
-                         "changelog":  [
-                                           "Version 1.2.5 release || Version 1.2.5 Release"
-                                       ]
-                     },
-                     {
-                         "version":  "1.2.4",
-                         "published":  "2026-06-12T10:44:43.8411225Z",
-                         "changelog":  [
-                                           "Version 1.2.4 release || Version 1.2.4 Release"
-                                       ]
-                     },
-                     {
-                         "version":  "1.2.3",
-                         "published":  "2026-06-11T16:11:29.2189781Z",
-                         "changelog":  [
-                                           "[Plugin] RitualHelper (Ritual Prices): prices show again in the ritual window; uses global EN/DE language setting || [Plugin] RitualHelper (Ritual Prices): Preise im Ritual-Fenster wieder sichtbar; nutzt globale EN/DE-Spracheinstellung",
-                                           "[New] MapKillCounter: map kills by rarity and map timer; optional horizontal layout; resizable overlay; timer pauses in town and on ESC; hides when game is in background || [Neu] MapKillCounter: Map-Kills nach Seltenheit und Map-Timer; horizontales Layout; Groesse anpassbar; Timer pausiert in Stadt und bei ESC; Overlay aus bei Spiel im Hintergrund",
-                                           "[Plugin] AuraTracker: added to the fork with German settings UI || [Plugin] AuraTracker: in den Fork integriert mit deutscher Einstellungs-UI",
-                                           "[Fix] RuneforgeHelper: reduced overlay flickering || [Fix] RuneforgeHelper: weniger Overlay-Flackern",
-                                           "[Fix] MapKillCounter: overlay resize is saved correctly; stays visible in GameHelper settings; hides only when another app (e.g. Discord) is focused || [Fix] MapKillCounter: Overlay-Groesse wird gespeichert; bleibt in GameHelper-Einstellungen sichtbar; ausblenden nur bei anderen Apps (z. B. Discord)",
-                                           "[Fix] Autopot: auto-logout cooldown and re-arm after vitals recover — no more instant re-logout loop after reconnecting || [Fix] Autopot: Auto-Logout mit Abklingzeit und Wieder-Scharfschaltung nach Erholung — kein sofortiger Logout-Loop nach Wiedereinloggen"
-                                       ]
-                     },
-                     {
-                         "version":  "1.2.2",
-                         "published":  "2026-06-11T15:56:36.1890899Z",
-                         "changelog":  [
-                                           "[Plugin] RitualHelper (Ritual Prices): prices show again in the ritual window; uses global EN/DE language setting || [Plugin] RitualHelper (Ritual Prices): Preise im Ritual-Fenster wieder sichtbar; nutzt globale EN/DE-Spracheinstellung",
-                                           "[New] MapKillCounter: map kills by rarity and map timer; optional horizontal layout; resizable overlay; timer pauses in town and on ESC; hides when game is in background || [Neu] MapKillCounter: Map-Kills nach Seltenheit und Map-Timer; horizontales Layout; Groesse anpassbar; Timer pausiert in Stadt und bei ESC; Overlay aus bei Spiel im Hintergrund",
-                                           "[Plugin] AuraTracker: added to the fork with German settings UI || [Plugin] AuraTracker: in den Fork integriert mit deutscher Einstellungs-UI",
-                                           "[Fix] RuneforgeHelper: reduced overlay flickering || [Fix] RuneforgeHelper: weniger Overlay-Flackern"
-                                       ]
-                     },
-                     {
-                         "version":  "1.2.1",
-                         "published":  "2026-06-10T18:10:28.8299268Z",
-                         "changelog":  [
-                                           "Version 1.2.1 release || Version 1.2.1 Release"
-                                       ]
-                     },
-                     {
-                         "version":  "1.2.0",
-                         "published":  "2026-06-10T17:42:52.3023901Z",
-                         "changelog":  [
-                                           "ZIP-only releases: smaller GitHub releases, one package per update. Install via GameHelperDownloader.exe or the full ZIP. || ZIP-only Releases: kleinere GitHub-Releases, ein Paket pro Update. Installation per GameHelperDownloader.exe oder Vollstaendig-ZIP.",
-                                           "Simplified update system (no more per-file downloads). || Vereinfachtes Update-System (keine Einzeldatei-Downloads mehr)."
-                                       ]
-                     },
-                     {
-                         "version":  "1.1.10",
-                         "published":  "2026-06-11T14:29:42.4385121Z",
-                         "changelog":  [
-                                           "Version 1.1.10 release || Version 1.1.10 Release"
-                                       ]
-                     },
-                     {
-                         "version":  "1.1.9",
-                         "published":  "2026-06-10T17:01:47.6732363Z",
-                         "changelog":  [
-                                           "latest Gordin Fork"
-                                       ]
-                     },
-                     {
-                         "version":  "1.1.8",
-                         "published":  "2026-06-10T16:43:15.3932845Z",
-                         "changelog":  [
-                                           "Version 1.1.8 release || Version 1.1.8 Release"
-                                       ]
-                     },
-                     {
-                         "version":  "1.1.7",
-                         "published":  "2026-06-10T15:33:06.6323192Z",
-                         "changelog":  [
-                                           "Version 1.1.7 release || Version 1.1.7 Release"
-                                       ]
-                     },
-                     {
-                         "version":  "1.1.6",
-                         "published":  "2026-06-10T14:17:54.2940579Z",
-                         "changelog":  [
-                                           "Improvements and bug fixes in this version. || Verbesserungen und Fehlerbehebungen in dieser Version.",
-                                           "Plugins and settings were updated. || Plugins und Einstellungen wurden aktualisiert."
-                                       ]
-                     },
-                     {
-                         "version":  "1.1.5",
-                         "published":  "2026-06-10T13:58:33.3927637Z",
-                         "changelog":  [
-                                           "Improvements and bug fixes in this version. || Verbesserungen und Fehlerbehebungen in dieser Version.",
-                                           "Plugins and settings were updated. || Plugins und Einstellungen wurden aktualisiert."
-                                       ]
-                     }
-                 ]
+{
+    "releases": [
+        {
+            "version": "1.4.12",
+            "published": "2026-08-25T14:08:07.887457+00:00",
+            "changelog": [
+                "﻿"
+            ]
+        },
+        {
+            "version": "1.4.11",
+            "published": "2026-08-07T05:12:49.6568700Z",
+            "changelog": [
+                "Gordin Sync"
+            ]
+        },
+        {
+            "version": "1.4.10",
+            "published": "2026-07-28T15:16:37.2883574Z",
+            "changelog": [
+                "Gordin Merge"
+            ]
+        },
+        {
+            "version": "1.4.9",
+            "published": "2026-07-22T15:18:37.2886880Z",
+            "changelog": [
+                "Gordin Sync"
+            ]
+        },
+        {
+            "version": "1.4.8",
+            "published": "2026-07-17T13:25:49.2293818Z",
+            "changelog": [
+                "Gordin Sync (New offsets)"
+            ]
+        },
+        {
+            "version": "1.4.7",
+            "published": "2026-07-14T14:55:08.6995944Z",
+            "changelog": [
+                "x"
+            ]
+        },
+        {
+            "version": "1.4.6",
+            "published": "2026-07-07T14:32:49.4336390Z",
+            "changelog": [
+                "New: PickupHelper (Gordin)",
+                "Atlas: 0.3.0 (yokkenUA)"
+            ]
+        },
+        {
+            "version": "1.4.5",
+            "published": "2026-07-05T04:46:46.1503054Z",
+            "changelog": [
+                "Update: RuneCrafthelper",
+                "Gordin Merge for localization",
+                "RunecraftHelper/ Atlas / SekhemaHelper / Atlas: UI localization  11 languages",
+                "RunecraftHelper:   Expedition planner fixes"
+            ]
+        },
+        {
+            "version": "1.4.4",
+            "published": "2026-07-02T15:06:45.3658571Z",
+            "changelog": [
+                "[Fix] hides Radar/Health Bars correctly when Atlas skill tree is opened (Gordin)",
+                "New: StashUtility (Tenchi)"
+            ]
+        },
+        {
+            "version": "1.4.3",
+            "published": "2026-06-29T16:36:39.1970826Z",
+            "changelog": [
+                "Atlas: Sea node content detection fixed; Overlapping routes stay readable",
+                "Controller support for Autopot (NicoFasho)",
+                "New Offsets by Immo",
+                "New:  LootTracker: Big quality-of-life drop for LootTracker (yokkenUA)"
+            ]
+        },
+        {
+            "version": "1.4.2",
+            "published": "2026-06-26T12:18:26.0552997Z",
+            "changelog": [
+                "Gordin core 2.4.2: MouseOverEntity, Expedition Radar icons",
+                "New: fixed overlay price issue on non-english game clients by yokkenUA"
+            ]
+        },
+        {
+            "version": "1.4.1",
+            "published": "2026-06-25T13:36:32.6995509Z",
+            "changelog": [
+                "Fix offsets + RunecraftHelper v0.1.3"
+            ]
+        },
+        {
+            "version": "1.4.0",
+            "published": "2026-06-25T13:28:39.7777663Z",
+            "changelog": [
+                "New Ofset thx to Chunn"
+            ]
+        },
+        {
+            "version": "1.3.14",
+            "published": "2026-06-23T21:22:05.5287565Z",
+            "changelog": [
+                "[Plugin] LootValue from Gordin"
+            ]
+        },
+        {
+            "version": "1.3.13",
+            "published": "2026-06-21T18:55:57.9094385Z",
+            "changelog": [
+                "[update] - RitualHelper: instant pricing without Ctrl+C (Thx Gordin, Sikaka) || [update] - RitualHelper: Sofort-Preise ohne Ctrl+C (Thx Gordin, Sikaka)",
+                "[update] - RuneforgeHelper: ninja stash art index and improved price cache || [update] - RuneforgeHelper: Ninja-Stash-Art-Index und verbesserter Preis-Cache"
+            ]
+        },
+        {
+            "version": "1.3.10",
+            "published": "2026-06-20T15:34:50.2171346Z",
+            "changelog": [
+                "[Fix] - AHK double klick (Thx to Gordin for Help)"
+            ]
+        },
+        {
+            "version": "1.3.9",
+            "published": "2026-06-20T12:43:03.5439851Z",
+            "changelog": [
+                "Version 1.3.9 release || Version 1.3.9 Release"
+            ]
+        },
+        {
+            "version": "1.3.8",
+            "published": "2026-06-20T09:22:37.1769914Z",
+            "changelog": [
+                "[Hiveblood 1.0.1] Throttled UI scans to reduce CPU usage || [Hiveblood 1.0.1] UI-Scans gedrosselt (weniger CPU)"
+            ]
+        },
+        {
+            "version": "1.3.7",
+            "published": "2026-06-20T01:37:57.1924948Z",
+            "changelog": [
+                "[New Plugin] - Hiveblood",
+                "[New Plugin] - FarmTracker"
+            ]
+        },
+        {
+            "version": "1.3.6",
+            "published": "2026-06-19T16:29:09.4700704Z",
+            "changelog": [
+                "[Plugin] SekhemaHelper: smarter affliction weights from your defensive stats — synced from yokkenUA v0.0.2 (original by Nekkoy) || [Plugin] SekhemaHelper: Affliction-Gewichte nach deinen Defensivwerten — Update von yokkenUA v0.0.2 (Original von Nekkoy)",
+                "[Plugin] RuneforgeHelper: recipe catalog updated for PoE2 0.5.3 HF3 — data from yokkenUA RunecraftHelper v0.1.1 (original by Nekkoy) || [Plugin] RuneforgeHelper: Rezeptkatalog für PoE2 0.5.3 HF3 — Daten von yokkenUA RunecraftHelper v0.1.1 (Original von Nekkoy)"
+            ]
+        },
+        {
+            "version": "1.3.5",
+            "published": "2026-06-19T12:40:05.5009653Z",
+            "changelog": [
+                "Version 1.3.5 release || Version 1.3.5 Release"
+            ]
+        },
+        {
+            "version": "1.3.4",
+            "published": "2026-06-17T14:35:18.0654447Z",
+            "changelog": [
+                "RuneforgeHelper: Monolith reward window + map value labels (YokkenUA)|| RuneforgeHelper: Monolith-Belohnungsfenster + Werte auf der Karte (YokkenUA)"
+            ]
+        },
+        {
+            "version": "1.3.3",
+            "published": "2026-06-16T13:37:06.0508171Z",
+            "changelog": [
+                "[Plugin] Radar: Abyss + Breach updates, correct runestone socket counts, hide labels when near || [Plugin] Radar: Abyss + Breach, korrekte Runenstein-Sockets, Zahlen in der Nähe ausblenden",
+                "[Info] If Radar icons look wrong after updating, delete Plugins/Radar/config/settings.txt once and restart || [Info] Wenn Radar-Icons nach dem Update falsch aussehen: einmal Plugins/Radar/config/settings.txt löschen und neu starten"
+            ]
+        },
+        {
+            "version": "1.3.2",
+            "published": "2026-06-14T15:55:33.0884532Z",
+            "changelog": [
+                "Version 1.3.2 release || Version 1.3.2 Release"
+            ]
+        },
+        {
+            "version": "1.3.1",
+            "published": "2026-06-13T14:54:42.8848906Z",
+            "changelog": [
+                "Version 1.3.1 release || Version 1.3.1 Release"
+            ]
+        },
+        {
+            "version": "1.3.0",
+            "published": "2026-06-12T12:07:52.6181669Z",
+            "changelog": [
+                "[New] Full source code is on GitHub (main branch) — build, audit, or skip auto-update anytime: https://github.com/MordWraith/Gamehelper || [Neu] Vollständiger Quellcode auf GitHub (main) — bauen, prüfen oder Auto-Update umgehen: https://github.com/MordWraith/Gamehelper",
+                "[New] Trust docs: signed ZIP updates, your configs/plugin settings are never overwritten — see SECURITY.md on GitHub || [Neu] Vertrauen: signierte ZIP-Updates, configs/Plugin-Einstellungen werden nie überschrieben — siehe SECURITY.md auf GitHub",
+                "[Fix] PlayerBuffBar: custom buff watchlist no longer resets to defaults on every startup || [Fix] PlayerBuffBar: eigene Buff-Watchlist wird beim Start nicht mehr auf Standard zurückgesetzt",
+                "[Plugin] PlayerBuffBar: Power / Frenzy / Endurance charges use in-game icons (poe2db) instead of P/E/F letters || [Plugin] PlayerBuffBar: Power-/Frenzy-/Endurance-Charges nutzen Ingame-Icons (poe2db) statt P/E/F",
+                "[Fix] Radar: boss arena path list reset fix — use Show Paths to Icons if boss markers look wrong after a bad auto-scan || [Fix] Radar: Boss-Arena-Pfadliste repariert — bei falschen Boss-Markern Show Paths to Icons nutzen",
+                "[Plugin] MapKillCounter: compact N/M/R/U rarity labels (language-independent) || [Plugin] MapKillCounter: kompakte N/M/R/U-Seltenheits-Labels (sprachunabhängig)"
+            ]
+        },
+        {
+            "version": "1.2.5",
+            "published": "2026-06-12T11:44:19.2655837Z",
+            "changelog": [
+                "Version 1.2.5 release || Version 1.2.5 Release"
+            ]
+        },
+        {
+            "version": "1.2.4",
+            "published": "2026-06-12T10:44:43.8411225Z",
+            "changelog": [
+                "Version 1.2.4 release || Version 1.2.4 Release"
+            ]
+        },
+        {
+            "version": "1.2.3",
+            "published": "2026-06-11T16:11:29.2189781Z",
+            "changelog": [
+                "[Plugin] RitualHelper (Ritual Prices): prices show again in the ritual window; uses global EN/DE language setting || [Plugin] RitualHelper (Ritual Prices): Preise im Ritual-Fenster wieder sichtbar; nutzt globale EN/DE-Spracheinstellung",
+                "[New] MapKillCounter: map kills by rarity and map timer; optional horizontal layout; resizable overlay; timer pauses in town and on ESC; hides when game is in background || [Neu] MapKillCounter: Map-Kills nach Seltenheit und Map-Timer; horizontales Layout; Groesse anpassbar; Timer pausiert in Stadt und bei ESC; Overlay aus bei Spiel im Hintergrund",
+                "[Plugin] AuraTracker: added to the fork with German settings UI || [Plugin] AuraTracker: in den Fork integriert mit deutscher Einstellungs-UI",
+                "[Fix] RuneforgeHelper: reduced overlay flickering || [Fix] RuneforgeHelper: weniger Overlay-Flackern",
+                "[Fix] MapKillCounter: overlay resize is saved correctly; stays visible in GameHelper settings; hides only when another app (e.g. Discord) is focused || [Fix] MapKillCounter: Overlay-Groesse wird gespeichert; bleibt in GameHelper-Einstellungen sichtbar; ausblenden nur bei anderen Apps (z. B. Discord)",
+                "[Fix] Autopot: auto-logout cooldown and re-arm after vitals recover — no more instant re-logout loop after reconnecting || [Fix] Autopot: Auto-Logout mit Abklingzeit und Wieder-Scharfschaltung nach Erholung — kein sofortiger Logout-Loop nach Wiedereinloggen"
+            ]
+        },
+        {
+            "version": "1.2.2",
+            "published": "2026-06-11T15:56:36.1890899Z",
+            "changelog": [
+                "[Plugin] RitualHelper (Ritual Prices): prices show again in the ritual window; uses global EN/DE language setting || [Plugin] RitualHelper (Ritual Prices): Preise im Ritual-Fenster wieder sichtbar; nutzt globale EN/DE-Spracheinstellung",
+                "[New] MapKillCounter: map kills by rarity and map timer; optional horizontal layout; resizable overlay; timer pauses in town and on ESC; hides when game is in background || [Neu] MapKillCounter: Map-Kills nach Seltenheit und Map-Timer; horizontales Layout; Groesse anpassbar; Timer pausiert in Stadt und bei ESC; Overlay aus bei Spiel im Hintergrund",
+                "[Plugin] AuraTracker: added to the fork with German settings UI || [Plugin] AuraTracker: in den Fork integriert mit deutscher Einstellungs-UI",
+                "[Fix] RuneforgeHelper: reduced overlay flickering || [Fix] RuneforgeHelper: weniger Overlay-Flackern"
+            ]
+        },
+        {
+            "version": "1.2.1",
+            "published": "2026-06-10T18:10:28.8299268Z",
+            "changelog": [
+                "Version 1.2.1 release || Version 1.2.1 Release"
+            ]
+        },
+        {
+            "version": "1.2.0",
+            "published": "2026-06-10T17:42:52.3023901Z",
+            "changelog": [
+                "ZIP-only releases: smaller GitHub releases, one package per update. Install via GameHelperDownloader.exe or the full ZIP. || ZIP-only Releases: kleinere GitHub-Releases, ein Paket pro Update. Installation per GameHelperDownloader.exe oder Vollstaendig-ZIP.",
+                "Simplified update system (no more per-file downloads). || Vereinfachtes Update-System (keine Einzeldatei-Downloads mehr)."
+            ]
+        },
+        {
+            "version": "1.1.10",
+            "published": "2026-06-11T14:29:42.4385121Z",
+            "changelog": [
+                "Version 1.1.10 release || Version 1.1.10 Release"
+            ]
+        },
+        {
+            "version": "1.1.9",
+            "published": "2026-06-10T17:01:47.6732363Z",
+            "changelog": [
+                "latest Gordin Fork"
+            ]
+        },
+        {
+            "version": "1.1.8",
+            "published": "2026-06-10T16:43:15.3932845Z",
+            "changelog": [
+                "Version 1.1.8 release || Version 1.1.8 Release"
+            ]
+        },
+        {
+            "version": "1.1.7",
+            "published": "2026-06-10T15:33:06.6323192Z",
+            "changelog": [
+                "Version 1.1.7 release || Version 1.1.7 Release"
+            ]
+        },
+        {
+            "version": "1.1.6",
+            "published": "2026-06-10T14:17:54.2940579Z",
+            "changelog": [
+                "Improvements and bug fixes in this version. || Verbesserungen und Fehlerbehebungen in dieser Version.",
+                "Plugins and settings were updated. || Plugins und Einstellungen wurden aktualisiert."
+            ]
+        },
+        {
+            "version": "1.1.5",
+            "published": "2026-06-10T13:58:33.3927637Z",
+            "changelog": [
+                "Improvements and bug fixes in this version. || Verbesserungen und Fehlerbehebungen in dieser Version.",
+                "Plugins and settings were updated. || Plugins und Einstellungen wurden aktualisiert."
+            ]
+        }
+    ]
 }

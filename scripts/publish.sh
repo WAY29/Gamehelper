@@ -72,7 +72,8 @@ if [[ "$SKIP_BUILD" -eq 0 ]]; then
   "$DOTNET" build "$(wslpath -w "$ROOT/GameOverlay.sln")" -c "$CONFIG" --no-restore
   rm -rf "$PUBLISH"
   mkdir -p "$PUBLISH"
-  rsync -a --exclude '*.pdb' "$OUT/" "$PUBLISH/"
+  cp -a "$OUT"/. "$PUBLISH"/
+  find "$PUBLISH" -name '*.pdb' -delete
   echo "=== Downloader ==="
   "$DOTNET" publish "$(wslpath -w "$DL_PROJ")" -c "$CONFIG" -r win-x64 \
     -o "$(wslpath -w "$ROOT/publish-downloader")" \
@@ -84,8 +85,10 @@ fi
 
 STAGE="$(python3 "$ROOT/scripts/make-release-assets.py" "$ROOT" "$VERSION" "${NOTES[@]}")"
 echo "=== Sign manifest ==="
-"$DOTNET" run --project "$(wslpath -w "$SIGN_PROJ")" -c Release -- \
-  sign "$(wslpath -w "$STAGE/manifest.json")"
+KEY="$ROOT/update-signing.key"
+[[ -f "$KEY" ]] || { echo "missing $KEY — run: $DOTNET run --project $(wslpath -w "$SIGN_PROJ") -c Release -- ensure"; exit 1; }
+openssl dgst -sha256 -sign "$KEY" -out /tmp/manifest.sig.bin "$STAGE/manifest.json"
+base64 -w0 /tmp/manifest.sig.bin > "$STAGE/manifest.sig"
 
 if [[ -f "$ROOT/GameHelperDownloader.exe" ]]; then
   cp "$ROOT/GameHelperDownloader.exe" "$STAGE/GameHelperDownloader.exe"
