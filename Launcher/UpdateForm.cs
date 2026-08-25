@@ -96,6 +96,8 @@ namespace Launcher
 
         private readonly Button languageButton;
 
+        private bool skipRequested;
+
 
 
         private UpdateOffer? currentOffer;
@@ -392,7 +394,7 @@ namespace Launcher
 
 
 
-            this.primaryButton = CreateButton("OK", Accent, new Point(416, 448), new Size(200, 40));
+            this.primaryButton = CreateButton("Start now", Accent, new Point(416, 448), new Size(200, 40));
 
             this.secondaryButton = CreateButton(
 
@@ -404,9 +406,9 @@ namespace Launcher
 
                 new Size(200, 40));
 
-            this.primaryButton.Enabled = false;
+            this.primaryButton.Enabled = true;
 
-            this.secondaryButton.Enabled = false;
+            this.secondaryButton.Enabled = true;
 
             this.primaryButton.Click += this.OnPrimaryClick;
 
@@ -811,7 +813,11 @@ namespace Launcher
 
                 var checkResult = await UpdateService.CheckForUpdateAsync(this.appExePath, this.installDir);
 
+                if (this.skipRequested || this.IsDisposed) return;
+
                 this.releaseHistory = await historyTask;
+
+                if (this.skipRequested || this.IsDisposed) return;
 
                 this.FillHistoryBox();
 
@@ -896,9 +902,11 @@ namespace Launcher
 
             this.changelogTabs.Visible = false;
 
-            this.primaryButton.Enabled = false;
+            this.primaryButton.Text = "Start now";
 
-            this.secondaryButton.Enabled = false;
+            this.primaryButton.Enabled = true;
+
+            this.secondaryButton.Enabled = true;
 
         }
 
@@ -1008,6 +1016,7 @@ namespace Launcher
 
             this.secondaryButton.Enabled = true;
 
+
         }
 
 
@@ -1055,6 +1064,7 @@ namespace Launcher
             this.primaryButton.Enabled = false;
 
             this.secondaryButton.Enabled = false;
+
 
 
 
@@ -1161,6 +1171,7 @@ namespace Launcher
             this.primaryButton.Enabled = true;
 
             this.secondaryButton.Enabled = true;
+
 
         }
 
@@ -1288,6 +1299,7 @@ namespace Launcher
 
             this.secondaryButton.Enabled = true;
 
+
         }
 
 
@@ -1299,6 +1311,20 @@ namespace Launcher
             switch (this.phase)
 
             {
+
+                case UpdateFormPhase.Checking:
+
+                    this.skipRequested = true;
+
+                    this.downloadCts?.Cancel();
+
+                    this.ShouldStartGame = true;
+
+                    this.Close();
+
+                    return;
+
+
 
                 case UpdateFormPhase.MigrationNotice:
 
@@ -1431,6 +1457,16 @@ namespace Launcher
             switch (this.phase)
 
             {
+
+                case UpdateFormPhase.Checking:
+
+                    this.ShouldStartGame = false;
+
+                    this.Close();
+
+                    return;
+
+
 
                 case UpdateFormPhase.MigrationNotice:
 
