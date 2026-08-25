@@ -100,6 +100,7 @@
   "settings.show_icon_paths.tooltip": "Глобальное включение/выключение пути к значку объекта. Не влияет на настройки отдельных путей к значкам.",
   "settings.show_player_names": "Показать имена игроков",
   "settings.show_player_names.tooltip": "Эта кнопка не будет работать, пока Игрок находится в Плети.",
+  "settings.show_runestone_socket": "Показать количество сокетов рунического камня",
   "settings.show_smooth_path": "Показать A* плавный путь к POI",
   "settings.show_smooth_path.tooltip": "Вычисляет и рисует кратчайший путь, по которому можно пройти (голубой).",
   "settings.show_straight_line": "Показывать прямую стрелку к POI",

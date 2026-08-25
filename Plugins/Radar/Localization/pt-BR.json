@@ -100,6 +100,7 @@
   "settings.show_icon_paths.tooltip": "Ativação/desativação global para caminho de ícone de entidade. Não afeta as configurações individuais do caminho do ícone.",
   "settings.show_player_names": "Mostrar nomes de jogadores",
   "settings.show_player_names.tooltip": "Este botão não funcionará enquanto o Jogador estiver no Flagelo.",
+  "settings.show_runestone_socket": "Mostrar a contagem de soquetes de Runestone",
   "settings.show_smooth_path": "Mostrar um caminho suave para POIs",
   "settings.show_smooth_path.tooltip": "Calcula e desenha o caminho real mais curto que pode ser percorrido (ciano).",
   "settings.show_straight_line": "Mostrar seta em linha reta para POIs",

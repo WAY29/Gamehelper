@@ -100,6 +100,7 @@
   "settings.show_icon_paths.tooltip": "Globales Ein-/Ausschalten für die Pfadfindung von Entitätssymbolen. Hat keinen Einfluss auf die Pfadeinstellungen einzelner Symbole.",
   "settings.show_player_names": "Spielernamen anzeigen",
   "settings.show_player_names.tooltip": "Diese Schaltfläche funktioniert nicht, während sich der Spieler in der Geißel befindet.",
+  "settings.show_runestone_socket": "Runenstein-Steckplatzanzahl anzeigen",
   "settings.show_smooth_path": "Zeigen Sie einen reibungslosen Pfad zu POIs an",
   "settings.show_smooth_path.tooltip": "Berechnet und zeichnet den tatsächlich kürzesten begehbaren Weg (Cyan).",
   "settings.show_straight_line": "Geraden Pfeil zu POIs anzeigen",

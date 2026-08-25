@@ -212,9 +212,15 @@ namespace Radar
         public float ReachedPathDistance = 50f;
 
         /// <summary>
+        /// When enabled, draw the socket-count label next to Runestone Encounter icons.
+        /// </summary>
+        public bool ShowRunestoneSockets = true;
+
+        /// <summary>
         /// When enabled, the socket-count label on a Runestone Encounter disappears once the
         /// player gets within <see cref="ReachedPathDistance"/> of it (remembered per map).
-        /// Independent of <see cref="HideReachedPaths"/>.
+        /// Independent of <see cref="HideReachedPaths"/>. Ignored when
+        /// <see cref="ShowRunestoneSockets"/> is off.
         /// </summary>
         public bool HideRunestoneSocketsWhenNear = true;
 

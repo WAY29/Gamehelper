@@ -100,6 +100,7 @@
   "settings.show_icon_paths.tooltip": "เปิด/ปิดทั่วโลกสำหรับเส้นทางไอคอนเอนทิตี ไม่ส่งผลต่อการตั้งค่าพาธของไอคอนแต่ละรายการ",
   "settings.show_player_names": "แสดงชื่อผู้เล่น",
   "settings.show_player_names.tooltip": "ปุ่มนี้จะไม่ทำงานในขณะที่ผู้เล่นอยู่ใน Scourge",
+  "settings.show_runestone_socket": "แสดงจำนวนซ็อกเก็ต Runestone",
   "settings.show_smooth_path": "แสดง A* เส้นทางที่ราบรื่นไปยัง POI",
   "settings.show_smooth_path.tooltip": "คำนวณและวาดเส้นทางเดินที่สั้นที่สุดตามจริง (สีฟ้า)",
   "settings.show_straight_line": "แสดงลูกศรเส้นตรงไปยัง POI",

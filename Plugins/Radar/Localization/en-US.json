@@ -100,6 +100,7 @@
   "settings.show_icon_paths.tooltip": "Global on/off for entity-icon pathing. Does not affect individual icon path settings.",
   "settings.show_player_names": "Show Player Names",
   "settings.show_player_names.tooltip": "This button will not work while Player is in the Scourge.",
+  "settings.show_runestone_socket": "Show Runestone socket count",
   "settings.show_smooth_path": "Show A* Smooth Path to POIs",
   "settings.show_smooth_path.tooltip": "Computes and draws the actual shortest walkable path (cyan).",
   "settings.show_straight_line": "Show Straight-Line Arrow to POIs",

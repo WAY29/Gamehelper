@@ -100,6 +100,7 @@
   "settings.show_icon_paths.tooltip": "Activación/desactivación global para la ruta de iconos de entidad. No afecta la configuración de la ruta de los iconos individuales.",
   "settings.show_player_names": "Mostrar nombres de jugadores",
   "settings.show_player_names.tooltip": "Este botón no funcionará mientras el jugador esté en Scourge.",
+  "settings.show_runestone_socket": "Mostrar el recuento de ranuras de Runestone",
   "settings.show_smooth_path": "Mostrar A* Ruta suave hacia los puntos de interés",
   "settings.show_smooth_path.tooltip": "Calcula y dibuja el camino transitable más corto real (cian).",
   "settings.show_straight_line": "Mostrar flecha en línea recta a los puntos de interés",

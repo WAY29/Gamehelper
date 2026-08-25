@@ -100,6 +100,7 @@
   "settings.show_icon_paths.tooltip": "Activation/désactivation globale pour le cheminement des icônes d'entité. N’affecte pas les paramètres de chemin d’icône individuel.",
   "settings.show_player_names": "Afficher les noms des joueurs",
   "settings.show_player_names.tooltip": "Ce bouton ne fonctionnera pas lorsque le joueur est dans le Fléau.",
+  "settings.show_runestone_socket": "Afficher le nombre de sockets de pierre runique",
   "settings.show_smooth_path": "Afficher un * chemin fluide vers les POI",
   "settings.show_smooth_path.tooltip": "Calcule et dessine le chemin praticable le plus court (cyan).",
   "settings.show_straight_line": "Afficher la flèche en ligne droite vers les POI",

@@ -231,11 +231,14 @@ namespace Radar
             ImGui.DragFloat(this.PluginText.Label("settings.icon_path_thickness", "Icon Path Thickness", "RadarIconPathThickness"), ref this.Settings.IconPathThickness, 0.1f, 0.1f, 10.0f, "%.1f");
             ImGui.Checkbox(this.PluginText.Label("settings.hide_reached_paths", "Hide reached paths for current map", "RadarHideReachedPaths"), ref this.Settings.HideReachedPaths);
             ImGuiHelper.ToolTip(this.PluginText.T("settings.hide_reached_paths.tooltip", "When you get close to a path target (entity, terrain POI or tile), its path stops being drawn for the rest of the current map. Resets automatically on area change."));
+            ImGui.Checkbox(this.PluginText.Label("settings.show_runestone_socket", "Show Runestone socket count", "RadarShowRunestoneSocket"), ref this.Settings.ShowRunestoneSockets);
+            ImGui.BeginDisabled(!this.Settings.ShowRunestoneSockets);
             ImGui.Checkbox(this.PluginText.Label("settings.hide_runestone_socket", "Hide Runestone socket count when near", "RadarHideRunestoneSocket"), ref this.Settings.HideRunestoneSocketsWhenNear);
             ImGuiHelper.ToolTip(this.PluginText.T("settings.hide_runestone_socket.tooltip", "When you get close to a Runestone Encounter, its socket-count label disappears for the rest of the map. Uses the Reached Distance below. Independent of 'Hide reached paths'."));
             ImGui.DragFloat(this.PluginText.Label("settings.runestone_socket_x_offset", "Runestone Socket X Offset", "RadarRunestoneSocketXOffset"), ref this.Settings.RunestoneSocketOffsetX, 0.5f);
             ImGui.DragFloat(this.PluginText.Label("settings.runestone_socket_y_offset", "Runestone Socket Y Offset", "RadarRunestoneSocketYOffset"), ref this.Settings.RunestoneSocketOffsetY, 0.5f);
             ImGuiHelper.ToolTip(this.PluginText.T("settings.runestone_socket_offset.tooltip", "Screen-pixel offset for the Runestone socket-count number."));
+            ImGui.EndDisabled();
             ImGui.DragFloat(this.PluginText.Label("settings.reached_distance", "Reached Distance", "RadarReachedDistance"), ref this.Settings.ReachedPathDistance, 1f, 1f, 500f, "%.0f");
             ImGuiHelper.ToolTip(this.PluginText.T("settings.reached_distance.tooltip", "Grid distance at which a path target, Abyss node, or runestone counts as reached."));
 
@@ -1371,46 +1374,49 @@ namespace Radar
                                 // Mark the runestone reached so its path hides like other paths.
                                 this.MarkReachedIfClose($"entity|{entity.Key.id}", pPos, ePos);
 
-                                // Prefer the authoritative RuneStation count; the "sockets"
-                                // state caps at 6 and under-reports higher-hole recipes.
-                                long sockets;
-                                if (runeSm.TryGetRuneStationSocketCount(out var stationSockets))
+                                if (this.Settings.ShowRunestoneSockets)
                                 {
-                                    sockets = stationSockets;
-                                }
-                                else
-                                {
-                                    sockets = 0;
-                                    foreach (var state in runeSm.States)
+                                    // Prefer the authoritative RuneStation count; the "sockets"
+                                    // state caps at 6 and under-reports higher-hole recipes.
+                                    long sockets;
+                                    if (runeSm.TryGetRuneStationSocketCount(out var stationSockets))
                                     {
-                                        if (state.Name == "sockets")
+                                        sockets = stationSockets;
+                                    }
+                                    else
+                                    {
+                                        sockets = 0;
+                                        foreach (var state in runeSm.States)
                                         {
-                                            sockets = state.Value;
-                                            break;
+                                            if (state.Name == "sockets")
+                                            {
+                                                sockets = state.Value;
+                                                break;
+                                            }
                                         }
                                     }
-                                }
 
-                                if (sockets > 0 && !this.IsRunestoneSocketHidden(entity.Key.id, pPos, ePos))
-                                {
-                                    var socketText = sockets.ToString();
+                                    if (sockets > 0 && !this.IsRunestoneSocketHidden(entity.Key.id, pPos, ePos))
+                                    {
+                                        var socketText = sockets.ToString();
 
-                                    // Bigger text overall; 5+ sockets get an even larger, red label.
-                                    var highSockets = sockets >= 5;
-                                    var fontScale = highSockets ? 3f : 1.8f;
-                                    var fontSize = ImGui.GetFontSize() * fontScale;
-                                    var textColor = highSockets
-                                        ? ImGuiHelper.Color(255, 40, 40, 255)
-                                        : ImGuiHelper.Color(255, 255, 255, 255);
+                                        // Bigger text overall; 5+ sockets get an even larger, red label.
+                                        var highSockets = sockets >= 5;
+                                        var fontScale = highSockets ? 3f : 1.8f;
+                                        var fontSize = ImGui.GetFontSize() * fontScale;
+                                        var textColor = highSockets
+                                            ? ImGuiHelper.Color(255, 40, 40, 255)
+                                            : ImGuiHelper.Color(255, 255, 255, 255);
 
-                                    var textSize = ImGui.CalcTextSize(socketText) * fontScale;
-                                    var textHalf = textSize / 2f;
-                                    var iconHalfWidth = iconSizeMultiplier * drawnRuneIcon.IconScale;
-                                    var textPos = new Vector2(
-                                        screenPos.X + iconHalfWidth + 2f + this.Settings.RunestoneSocketOffsetX,
-                                        screenPos.Y - textHalf.Y + this.Settings.RunestoneSocketOffsetY);
-                                    fgDraw.AddText(ImGui.GetFont(), fontSize, textPos,
-                                        textColor, socketText);
+                                        var textSize = ImGui.CalcTextSize(socketText) * fontScale;
+                                        var textHalf = textSize / 2f;
+                                        var iconHalfWidth = iconSizeMultiplier * drawnRuneIcon.IconScale;
+                                        var textPos = new Vector2(
+                                            screenPos.X + iconHalfWidth + 2f + this.Settings.RunestoneSocketOffsetX,
+                                            screenPos.Y - textHalf.Y + this.Settings.RunestoneSocketOffsetY);
+                                        fgDraw.AddText(ImGui.GetFont(), fontSize, textPos,
+                                            textColor, socketText);
+                                    }
                                 }
                             }
                         }

@@ -100,6 +100,7 @@
   "settings.show_icon_paths.tooltip": "实体图标路径的全局开关。不影响单个图标的路径设置。",
   "settings.show_player_names": "显示玩家名称",
   "settings.show_player_names.tooltip": "玩家在 Scourge 中时此按钮不起作用。",
+  "settings.show_runestone_socket": "显示符文石孔数",
   "settings.show_smooth_path": "显示到 POI 的 A* 平滑路径",
   "settings.show_smooth_path.tooltip": "计算并绘制实际最短可行走路径（青色）。",
   "settings.show_straight_line": "显示到 POI 的直线箭头",

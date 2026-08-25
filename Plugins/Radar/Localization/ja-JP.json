@@ -100,6 +100,7 @@
   "settings.show_icon_paths.tooltip": "エンティティアイコンのパスのグローバルなオン/オフ。個々のアイコンのパス設定には影響しません。",
   "settings.show_player_names": "プレイヤー名を表示",
   "settings.show_player_names.tooltip": "プレイヤーがスカージにいる間、このボタンは機能しません。",
+  "settings.show_runestone_socket": "ルーンストーンのソケット数を表示",
   "settings.show_smooth_path": "POI への A* スムーズ パスを表示",
   "settings.show_smooth_path.tooltip": "実際の歩行可能な最短パス (シアン) を計算して描画します。",
   "settings.show_straight_line": "POI に直線矢印を表示",
