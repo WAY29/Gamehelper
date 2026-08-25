@@ -859,8 +859,11 @@ namespace RunecraftHelper
                     if (centreY < clipTop || centreY > clipBottom) continue;
                 }
 
-                var text = FormatExalted(row.Total);
-                uint color = this.PickColor(row.Total, median);
+                var text = this.FormatRewardPrice(row.Total);
+                double divRate = this.priceCache.DivineToExaltedRate;
+                uint color = divRate > 0 && row.Total >= divRate
+                    ? ColorYellow
+                    : this.PickColor(row.Total, median);
 
                 // Scale the price text to the row height so it reads at any UI scale.
                 float fontPx = Math.Clamp(row.Size.Y * 0.5f, 12f, 40f);
@@ -1326,19 +1329,6 @@ namespace RunecraftHelper
             while (i > 0 && char.IsDigit(metaId[i - 1])) i--;
             if (i == metaId.Length) return -1;
             return int.TryParse(metaId.AsSpan(i), out var n) ? n : -1;
-        }
-
-        private static string FormatExalted(double value)
-        {
-            // Round by magnitude, then strip trailing zeros but keep at least one decimal for
-            // sub-100 values — so a ~1ex reward reads "1,0 ex", not "1,000 ex".
-            if (value >= 100) return $"{value:F0} ex";
-            int decimals = value >= 1 ? 1 : value >= 0.1 ? 2 : 3;
-            double rounded = Math.Round(value, decimals, MidpointRounding.AwayFromZero);
-            string num = rounded.ToString("0.###");
-            var sep = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
-            if (!num.Contains(sep)) num += sep + "0";
-            return $"{num} ex";
         }
 
         private static string FormatRelative(DateTime utc)
