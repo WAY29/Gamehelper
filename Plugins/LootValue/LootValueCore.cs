@@ -1263,8 +1263,7 @@ namespace LootValue
                 $"WorldItem path={wiPath}    Metadata/Items path={metaItemsPath}\n" +
                 $"WorldItem component={wiComp}    inner item OK={innerOk}\n" +
                 $"priced={priced}    belowFloor(<{this.Settings.MinValueEx}ex)={belowFloor}    wouldDraw={priced - belowFloor}\n" +
-                $"priceDB={PoeNinjaPriceFetcher.LoadedItemCount}  fetching={PoeNinjaPriceFetcher.IsFetching}  i18n={ItemLocalization.Count}\n" +
-                $"i18n 完美混沌石 -> {ItemLocalization.ResolveEnglish("完美混沌石")} / 混沌石 -> {ItemLocalization.ResolveEnglish("混沌石")}\n" +
+                $"priceDB={PoeNinjaPriceFetcher.LoadedItemCount}  fetching={PoeNinjaPriceFetcher.IsFetching}\n" +
                 this.FormatHoveredDiag();
         }
 

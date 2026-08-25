@@ -15,8 +15,6 @@ namespace LootValue
         private static readonly Dictionary<string, List<string>> KeysByPrefix = new(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, string> ToEnglish = new(StringComparer.OrdinalIgnoreCase);
 
-        public static int Count => ByEnglish.Count;
-
         public static void Load(string pluginDirectory)
         {
             ByEnglish.Clear();
