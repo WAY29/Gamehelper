@@ -296,9 +296,15 @@ namespace RunecraftHelper
 
                 if (hasPrice)
                 {
-                    // Same tint as the rewards-window header (shared helper); untinted → white on the map.
-                    uint col = this.MonolithValueColor(v.Best, maxBest, out _);
-                    var text = $"{v.Best:F0} ex";
+                    uint col = this.PriceColor(v.Best, maxBest, out _);
+                    string price = this.FormatRewardPrice(v.Best);
+                    string text = price;
+                    if (!string.IsNullOrEmpty(v.BestReward))
+                    {
+                        text = v.BestCount > 1
+                            ? $"{v.BestCount}x {v.BestReward} {price}"
+                            : $"{v.BestReward} {price}";
+                    }
                     var ts = ImGui.CalcTextSize(text) * k;
                     var at = new Vector2(screen.X - (ts.X * 0.5f), priceTopY);
                     dl.AddRectFilled(at - pad, at + ts + pad, monoBg, 2f);
@@ -324,6 +330,25 @@ namespace RunecraftHelper
                     }
                 }
             }
+        }
+
+        // ponytail: F0 past 10d, two decimals below; tighter format if map labels get too wide.
+        private static string FormatDivine(double d) =>
+            d >= 10 ? $"{d:F0} d" : $"{d:0.##} d";
+
+        private string FormatRewardPrice(double exalted)
+        {
+            if (exalted <= 0) return "—";
+            double rate = this.priceCache.DivineToExaltedRate;
+            if (rate > 0 && exalted >= rate) return FormatDivine(exalted / rate);
+            return $"{exalted:F0} ex";
+        }
+
+        private uint PriceColor(double best, double maxBest, out bool tinted)
+        {
+            double rate = this.priceCache.DivineToExaltedRate;
+            if (rate > 0 && best >= rate) { tinted = true; return ColorYellow; }
+            return this.MonolithValueColor(best, maxBest, out tinted);
         }
 
         private void DrawMonolithRewardsWindow()
@@ -367,27 +392,9 @@ namespace RunecraftHelper
 
                 foreach (var v in this.monolithViews)
                 {
-                    double best = 0;
-                    foreach (var c in v.Candidates)
-                        if (c.Priced) best = Math.Max(best, c.UnitEx * c.Count);
+                    string hdr = $"{this.FormatRewardPrice(v.Best)}###m{v.EntityId}";
 
-                    string hdr;
-                    // Diagnostic marker: ▶ flags the monolith whose Combinations panel the plugin
-                    // currently detects as open (station+0xB8). This is the gate for the in-panel gold
-                    // price-box highlight, so it lets the user confirm detection at a glance.
-                    string panelMark = v.PanelOpen ? "▶ " : string.Empty;
-                    if (v.IsRerolled && v.Candidates.Count > 0)
-                        // Sealed: recipe locked — show the one reward + its value, not "best of N".
-                        hdr = $"{panelMark}[locked] {v.Candidates[0].Reward}  ·  {v.Distance:F0}  ·  {best:F0} ex###m{v.EntityId}";
-                    else if (v.IsUnique)
-                        hdr = $"{panelMark}Unique Monolith  ·  {v.HoleCount} holes  ·  {v.Distance:F0}  ·  best {best:F0} ex###m{v.EntityId}";
-                    else if (v.AnchorIdx >= 0)
-                        hdr = $"{panelMark}{v.AnchorName}  ·  hole {v.AnchorPos + 1}/{v.HoleCount}  ·  {v.Distance:F0}  ·  best {best:F0} ex###m{v.EntityId}";
-                    else
-                        hdr = $"{panelMark}(anchor ?)  ·  {v.HoleCount} holes  ·  {v.Distance:F0}###m{v.EntityId}";
-
-                    // Header tint via the shared helper so it matches the map-overlay label exactly.
-                    uint hdrColor = this.MonolithValueColor(best, maxBest, out bool colorHdr);
+                    uint hdrColor = this.PriceColor(v.Best, maxBest, out bool colorHdr);
                     if (colorHdr) ImGui.PushStyleColor(ImGuiCol.Text, hdrColor);
                     bool open = ImGui.CollapsingHeader(hdr, ImGuiTreeNodeFlags.None);
                     if (colorHdr) ImGui.PopStyleColor();
@@ -793,9 +800,22 @@ namespace RunecraftHelper
                 }
 
                 double best = 0;
+                string bestReward = string.Empty;
+                int bestCount = 1;
                 foreach (var c in v.Candidates)
-                    if (c.Priced) best = Math.Max(best, c.UnitEx * c.Count);
+                {
+                    if (!c.Priced) continue;
+                    double t = c.UnitEx * c.Count;
+                    if (t > best)
+                    {
+                        best = t;
+                        bestReward = c.Reward;
+                        bestCount = c.Count;
+                    }
+                }
                 v.Best = best;
+                v.BestReward = bestReward;
+                v.BestCount = bestCount;
 
                 // Foreign standalone monolith (current "modified Expedition" league): NOT part of the explosive
                 // dig — the player collects it by hand, so the chain planner must never anchor to it. The game's
@@ -1341,6 +1361,8 @@ namespace RunecraftHelper
             public float TerrainHeight;    // monolith terrain height (for the radar-map projection)
             public bool HasPos;            // GridPos/TerrainHeight were read
             public double Best;            // best priced reward total (header tint + map label)
+            public string BestReward = string.Empty; // localized name of the Best row (map label)
+            public int BestCount = 1;
             public int HoleCount;          // N — authoritative, from station +0x38
             public int SocketsState = -1;  // StateMachine "sockets" value (for debug; can under-read N)
             public int AreaLevel;
