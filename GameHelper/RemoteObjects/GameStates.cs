@@ -91,11 +91,20 @@ namespace GameHelper.RemoteObjects
         protected override void UpdateData(bool hasAddressChanged)
         {
             var reader = Core.Process.Handle;
-            if (hasAddressChanged)
+            // GameNotLoaded means the first attach read happened before GameState was
+            // populated. Address does not change after that, so keep re-reading until
+            // ApplyCurrentState actually resolves a real state — otherwise we stay
+            // latched until GameHelper is restarted.
+            if (hasAddressChanged || this.currentStateName == GameStateTypes.GameNotLoaded)
             {
                 lock (this.gameStatesLock)
                 {
                     this.myStaticObj = reader.ReadMemory<GameStateStaticOffset>(this.Address);
+                    if (this.myStaticObj.GameState == IntPtr.Zero)
+                    {
+                        return;
+                    }
+
                     var data = reader.ReadMemory<GameStateOffset>(this.myStaticObj.GameState);
                     this.AllStates.Clear();
                     for (var i = 0; i < GameStateHelper.TOTAL_STATES; i++)
