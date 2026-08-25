@@ -2,9 +2,15 @@
     "releases": [
         {
             "version": "1.4.12",
-            "published": "2026-08-25T14:08:07.887457+00:00",
+            "published": "2026-08-25T23:44:00.624490+00:00",
             "changelog": [
-                "﻿"
+                "CJK atlas names and loot-tag localization",
+                "LootValue prices CJK currency by metadata id",
+                "GameNotLoaded no longer latches until restart",
+                "Overlay size follows the game window DPI",
+                "Launcher Start now while checking updates",
+                "RunecraftHelper map labels show item name; ≥1 divine in d (yellow)",
+                "Radar toggle for Runestone socket-count labels"
             ]
         },
         {
