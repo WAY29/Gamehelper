@@ -74,7 +74,8 @@
             public StdTuple2D<int> GridPosition;
             public List<StdTuple2D<int>> ConnectedGridPositions;
             public string InternalId;       // internal map id (e.g. "MapUniqueReactor_04"), locale-independent
-            public string MapName;          // normalized display name
+            public string MapName;          // normalized display name (current language)
+            public List<string> NameAliases;
             public byte BiomeId;
             public AtlasNodeState State;
             public int BadgeCount;
@@ -131,8 +132,16 @@
                 Settings.CategorySettingsVersion = defaults.CategorySettingsVersion;
             }
 
+            if (!Settings.ShowLabelsMigrated && Settings.MapGroups != null)
+            {
+                foreach (var group in Settings.MapGroups)
+                    group.ShowLabels = DefaultShowLabels(group);
+                Settings.ShowLabelsMigrated = true;
+            }
+
             LoadBiomeMap();
             LoadContentMap();
+            AreaLocalization.Load(DllDirectory);
         }
 
         public override void SaveSettings()
@@ -153,14 +162,21 @@
             ImGui.SameLine();
             if (ImGui.SmallButton("Clear"))
                 Settings.SearchQuery = string.Empty;
-            ImGui.SeparatorText("Show shortest path to");
+            ImGui.SeparatorText("Map groups");
+            ImGui.TextDisabled("Label paints the map name. Path draws the shortest route.");
             DrawUnifiedCategories();
 
             ImGui.SliderFloat("Path Thickness", ref Settings.PathLineThickness, 1.0f, 8.0f);
 
             ImGui.SeparatorText("Atlas Settings");
+            ImGui.SetNextItemWidth(220);
+            ImGui.Combo("Map names", ref Settings.MapNameLanguage, "Follow UI\0English\0简体中文\0繁體中文\0");
+            ImGui.Checkbox("Draw names on revealed maps", ref Settings.DrawRevealedMapNames);
+            ImGuiHelper.ToolTip("On: also draw Label groups on revealed maps. Off: Label groups only in the fog; revealed maps keep the game's own names.");
             ImGui.Checkbox("Hide Completed Maps", ref Settings.HideCompletedMaps);
+            ImGuiHelper.ToolTip("Hide overlay labels on maps you have already completed.");
             ImGui.Checkbox("Hide Not Accessible Maps", ref Settings.HideNotAccessibleMaps);
+            ImGuiHelper.ToolTip("Hide overlay labels on maps still in the fog, unless a path is being drawn to them.");
             ImGui.Checkbox("Show Map Counts", ref Settings.ShowMapCounts);
             ImGuiHelper.ToolTip("Draw connected-node and badge counts under each map label on the Atlas.");
             ImGui.Checkbox("Show Content", ref Settings.ShowContent);
@@ -314,7 +330,8 @@
                         for (int j = 0; j < mapGroup.Maps.Count; j++)
                         {
                             var mapName = mapGroup.Maps[j];
-                            if (ImGui.InputTextWithHint($"##MapName{i}-{j}", "map name", ref mapName, 256))
+                            var shown = AreaLocalization.DisplayName(mapName, mapName, Settings.MapNameLanguage);
+                            if (ImGui.InputTextWithHint($"##MapName{i}-{j}", shown, ref mapName, 256))
                                 mapGroup.Maps[j] = mapName;
 
                             ImGui.SameLine();
@@ -588,6 +605,12 @@
                         continue;
 
                     var group = Settings.MapGroups.FirstOrDefault(g => MatchesCategory(g, nd, mapName, doSearch, matchesSearch));
+                    bool searchHit = doSearch && matchesSearch;
+                    bool groupedLabel = group != null && group.ShowLabels;
+                    if (!groupedLabel && !searchHit)
+                        continue;
+                    if (!notAccessible && !Settings.DrawRevealedMapNames && !searchHit)
+                        continue;
 
                     var backgroundColor = group?.BackgroundColor ?? Settings.DefaultBackgroundColor;
                     var fontColor = group?.FontColor ?? Settings.DefaultFontColor;
@@ -753,7 +776,8 @@
                     GridPosition = map.GridPosition,
                     ConnectedGridPositions = map.ConnectedGridPositions.ToList(),
                     InternalId = map.MapId,
-                    MapName = NormalizeName(map.DisplayName),
+                    MapName = NormalizeName(AreaLocalization.DisplayName(map.MapId, map.DisplayName, Settings.MapNameLanguage)),
+                    NameAliases = AreaLocalization.Aliases(map.MapId, map.DisplayName).Select(NormalizeName).ToList(),
                     BiomeId = map.BiomeId,
                     State = ToAtlasNodeState(map.State),
                     BadgeCount = map.BadgeCount,
@@ -1357,12 +1381,11 @@
         private static bool MatchesCategory(MapGroupSettings category, NodeData node, string mapName,
             bool searchActive, bool matchesSearch)
         {
-            if (category.Maps.Any(map => NormalizeName(map).Equals(mapName, StringComparison.OrdinalIgnoreCase)))
+            if (category.Maps.Any(map => AliasEquals(node, map) || NormalizeName(map).Equals(mapName, StringComparison.OrdinalIgnoreCase)))
                 return true;
 
             bool Enabled(string label) => category.BuiltInTargets.TryGetValue(label, out var enabled) && enabled;
-            bool Named() => category.BuiltInTargets.Any(target => target.Value
-                && NormalizeName(target.Key).Equals(mapName, StringComparison.OrdinalIgnoreCase));
+            bool Named() => category.BuiltInTargets.Any(target => target.Value && AliasEquals(node, target.Key));
 
             return category.BuiltInKey switch
             {
@@ -1395,10 +1418,32 @@
             return Luminance(background) > Luminance(foreground) ? background : foreground;
         }
 
+        private static bool DefaultShowLabels(MapGroupSettings group)
+        {
+            return group.BuiltInKey is "unique" or "towers" or "arbiter" or "ritual"
+                or "lineage" or "expedition" or "abyss" or "temple"
+                or "quests" or "atlas_progression" or "breach"
+                or "corrupted_nexus" or "grand_mirror";
+        }
+
+        private static bool AliasEquals(NodeData node, string value)
+        {
+            var needle = NormalizeName(value);
+            if (string.IsNullOrEmpty(needle))
+                return false;
+            if (needle.Equals(node.MapName, StringComparison.OrdinalIgnoreCase))
+                return true;
+            return node.NameAliases != null &&
+                   node.NameAliases.Any(alias => needle.Equals(alias, StringComparison.OrdinalIgnoreCase));
+        }
+
         private static bool MatchesSearch(NodeData node, string mapName, string searchTerm)
         {
-            return mapName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                   HasAtlasContent(node, searchTerm);
+            if (mapName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                HasAtlasContent(node, searchTerm))
+                return true;
+            return node.NameAliases != null &&
+                   node.NameAliases.Any(alias => alias.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IsCorruptedNexus(NodeData node)
@@ -1513,13 +1558,17 @@
             {
                 var category = Settings.MapGroups[i];
                 ImGui.PushID(i);
+                ImGui.Checkbox("##label", ref category.ShowLabels);
+                ImGuiHelper.ToolTip("Show overlay name labels for maps in this group.");
+                ImGui.SameLine();
                 ImGui.Checkbox("##route", ref category.DrawPath);
+                ImGuiHelper.ToolTip("Draw the shortest path to maps in this group.");
                 ImGui.SameLine();
                 ColorSwatch("##pathText", ref category.FontColor);
-                ImGuiHelper.ToolTip("Node-text color. The path automatically uses the more colorful of the text and background colors.");
+                ImGuiHelper.ToolTip("Label text color. Path uses the more colorful of text and background.");
                 ImGui.SameLine();
                 ColorSwatch("##background", ref category.BackgroundColor);
-                ImGuiHelper.ToolTip("Node background color. The path automatically uses the more colorful of the text and background colors.");
+                ImGuiHelper.ToolTip("Label background color. Path uses the more colorful of text and background.");
                 ImGui.SameLine();
                 ImGui.SetNextItemWidth(75);
                 ImGui.SliderInt("##hops", ref category.MaxHops, 1, 200);
@@ -1541,14 +1590,16 @@
                     foreach (var target in targetNames)
                     {
                         bool enabled = category.BuiltInTargets[target];
-                        if (ImGui.Checkbox($"{target}##fixed", ref enabled)) category.BuiltInTargets[target] = enabled;
+                        var label = AreaLocalization.DisplayName(target, target, Settings.MapNameLanguage);
+                        if (ImGui.Checkbox($"{label}##fixed{target}", ref enabled)) category.BuiltInTargets[target] = enabled;
                     }
 
                     for (int j = 0; j < category.Maps.Count; j++)
                     {
                         var map = category.Maps[j];
+                        var shown = AreaLocalization.DisplayName(map, map, Settings.MapNameLanguage);
                         ImGui.SetNextItemWidth(260);
-                        if (ImGui.InputTextWithHint($"##map{j}", "map name", ref map, 256)) category.Maps[j] = map;
+                        if (ImGui.InputTextWithHint($"##map{j}", shown, ref map, 256)) category.Maps[j] = map;
                         ImGui.SameLine();
                         if (ImGui.SmallButton($"Remove##map{j}")) { category.Maps.RemoveAt(j); break; }
                     }

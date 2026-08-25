@@ -10,6 +10,16 @@ namespace Atlas2
         public Vector4 DefaultBackgroundColor = new(0f, 0f, 0f, 0.85f);
         public Vector4 DefaultFontColor = new(1f, 1f, 1f, 1.0f);
 
+        /// <summary>0 = follow UI language, 1 = English, 2 = zh-CN, 3 = zh-TW.</summary>
+        public int MapNameLanguage = 3;
+
+        /// <summary>
+        /// When false, revealed maps keep the game's own names; the overlay only draws
+        /// colored pills for highlight groups. Fog-of-war maps always get overlay names.
+        /// </summary>
+        public bool DrawRevealedMapNames = false;
+        public bool ShowLabelsMigrated;
+
         public bool ControllerMode = false;
 
         public string SearchQuery = string.Empty;
@@ -106,14 +116,23 @@ namespace Atlas2
             MapGroups[^1].DrawPath = true;
             AddNamed("Lineage Maps", "lineage", new(0f, 0f, 0f, 1f), "Derelict Mansion", "Sacred Reservoir", "Sealed Vault", "The Jade Isles");
             MapGroups[^1].BackgroundColor = new(0f, 181f / 255f, 33f / 255f, 1f);
+            MapGroups[^1].ShowLabels = true;
             AddBuiltIn("Corrupted Nexus", "corrupted_nexus", new(0.45f, 0f, 0f, 1f), new(0f, 0f, 0f, 0.85f), "Corrupted Nexus content");
+            MapGroups[^1].ShowLabels = true;
             AddBuiltIn("Grand Mirror", "grand_mirror", new(0f, 170f / 255f, 1f, 1f), new(0f, 0f, 0f, 0.85f), "Grand Mirror content");
+            MapGroups[^1].ShowLabels = true;
             AddNamed("Atlas Progression", "atlas_progression", new(0.55f, 0.27f, 0.07f, 1f), "Precursor Tower", "Ancient Gateway", "The Burning Monolith", "Western Gateway", "Eastern Gateway", "Western Enigma Chamber", "Eastern Enigma Chamber", "The Origin Tower");
+            MapGroups[^1].ShowLabels = true;
             AddNamed("Quests", "quests", new(0f, 1f, 1f, 1f), "The Withered Willow");
+            MapGroups[^1].ShowLabels = true;
             AddNamed("Ritual", "ritual", new(0.25f, 0f, 0.96f, 1f), "Caer Tarth", "Crux of Nothingness");
             MapGroups[^1].BackgroundColor = new(1f, 1f, 1f, 0.85f);
+            MapGroups[^1].ShowLabels = true;
             AddNamed("Breach", "breach", new(1f, 0.2f, 0.74f, 1f), "Hive Colony", "Hive Fortress");
-            AddNamed("Expedition", "expedition", new(0.36f, 0.76f, 0.93f, 1f), "Barren Atoll", "Bleached Shoals", "Craggy Peninsula", "Exhumed Ruins", "Frigid Bluffs", "Grazed Prairie", "Lush Isle", "Moor of Fallen Skies", "Mournful Cliffside", "Obscure Island", "Scorched Cay", "Secluded Temple", "Sloughed Gully", "Sprawling Jungle", "Stagnant Basin", "The Chained Beast", "The Fallen Star", "Tomb of the Fallen Knight", "Ruins of Kingsmarch");
+            MapGroups[^1].ShowLabels = true;
+            AddNamed("Expedition", "expedition", new(1f, 1f, 1f, 1f), "Barren Atoll", "Bleached Shoals", "Craggy Peninsula", "Exhumed Ruins", "Frigid Bluffs", "Grazed Prairie", "Lush Isle", "Moor of Fallen Skies", "Mournful Cliffside", "Obscure Island", "Scorched Cay", "Secluded Temple", "Sloughed Gully", "Sprawling Jungle", "Stagnant Basin", "The Chained Beast", "The Fallen Star", "Tomb of the Fallen Knight", "Ruins of Kingsmarch");
+            MapGroups[^1].BackgroundColor = new(0.18f, 0.38f, 0.95f, 0.95f);
+            MapGroups[^1].ShowLabels = true;
             var defaultExpeditionTargets = new HashSet<string>
             {
                 "Moor of Fallen Skies", "Mournful Cliffside", "Obscure Island", "Secluded Temple",
@@ -122,14 +141,19 @@ namespace Atlas2
             foreach (var target in MapGroups[^1].BuiltInTargets.Keys.ToList())
                 MapGroups[^1].BuiltInTargets[target] = defaultExpeditionTargets.Contains(target);
             AddNamed("Abyss", "abyss", new(0.15f, 1f, 0f, 1f), "The Well of Souls");
+            MapGroups[^1].ShowLabels = true;
             AddNamed("Temple", "temple", new(0.87f, 0.65f, 0f, 1f), "Vaal Ruins");
+            MapGroups[^1].ShowLabels = true;
             AddNamed("Citadels", "arbiter", new(1f, 0f, 0f, 1f), "The Copper Citadel", "The Iron Citadel", "The Stone Citadel", "The Matriarch Halls", "The Patriarch Halls");
             MapGroups[^1].BackgroundColor = new(1f, 1f, 1f, 0.85f);
+            MapGroups[^1].ShowLabels = true;
             AddNamed("Towers", "towers", new(0f, 0f, 0f, 0.85f), "Bluff", "Lost Towers", "Mesa", "Sinking Spire", "Alpine Ridge");
             MapGroups[^1].BackgroundColor = new(0.86f, 0f, 0.88f, 1f);
+            MapGroups[^1].ShowLabels = true;
             AddNamed("Good", "good", new(1f, 1f, 0f, 1f), "Burial Bog", "Creek", "Rustbowl", "Sandspit", "Savannah", "Steaming Springs", "Steppe", "Wetlands", "Willow");
             AddNamed("Unique Maps", "unique", new(0f, 0f, 0f, 0.85f), "Ancient Gateway", "Castaway", "Eastern Gateway", "Freight", "Jado's Campsite", "Merchant's Campsite", "Moment of Zen", "Moor of Fallen Skies", "Precursor Tower", "Site of the Chosen", "The Ezomyte Megaliths", "The Fractured Lake", "The Silent Cave", "The Viridian Wildwood", "The Voyage", "Untainted Paradise", "Vaults of Kamasa", "Western Gateway");
             MapGroups[^1].BackgroundColor = new(1f, 0.56f, 0f, 1f);
+            MapGroups[^1].ShowLabels = true;
             AddNamed("Special", "special", new(1f, 1f, 1f, 1f), "Ice Cave");
         }
 
@@ -154,6 +178,7 @@ namespace Atlas2
         public Vector4 BackgroundColor = backgroundColor;
         public Vector4 FontColor = fontColor;
         public bool DrawPath = false;
+        public bool ShowLabels = false;
         public int MaxHops = 15;
         public string BuiltInKey = string.Empty;
         public Dictionary<string, bool> BuiltInTargets = [];
