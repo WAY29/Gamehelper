@@ -23,7 +23,9 @@ namespace GameHelper
         ///     Initializes a new instance of the <see cref="GameOverlay" /> class.
         /// </summary>
         internal GameOverlay(string windowTitle)
-            : base(windowTitle, true, 3840, 2160)
+            // DPIAware=false: SetProcessDPIAware fights the manifest PerMonitorV2
+            // context and made overlay size jump when the game lost focus.
+            : base(windowTitle, false, 3840, 2160)
         {
             CoroutineHandler.Start(this.UpdateOverlayBounds(), priority: int.MaxValue);
             SettingsWindow.InitializeCoroutines();

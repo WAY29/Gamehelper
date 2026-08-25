@@ -384,17 +384,41 @@ namespace GameHelper
         /// </summary>
         private void UpdateWindowRectangle()
         {
-            GetClientRect(this.Information.MainWindowHandle, out var size);
-            ClientToScreen(this.Information.MainWindowHandle, out var pos);
-            var sizePos = size.ToRectangle(pos);
-            if (sizePos != this.WindowArea && sizePos.Size != Size.Empty)
+            var hwnd = this.Information.MainWindowHandle;
+            var gameDpi = GetWindowDpiAwarenessContext(hwnd);
+            if (gameDpi == IntPtr.Zero)
             {
-                this.WindowArea = sizePos;
-                CoroutineHandler.RaiseEvent(GameHelperEvents.OnMoved);
+                gameDpi = DpiAwarenessContextPerMonitorAwareV2;
+            }
+
+            var previous = SetThreadDpiAwarenessContext(gameDpi);
+            try
+            {
+                GetClientRect(hwnd, out var size);
+                ClientToScreen(hwnd, out var pos);
+                var sizePos = size.ToRectangle(pos);
+                if (sizePos != this.WindowArea && sizePos.Size != Size.Empty)
+                {
+                    this.WindowArea = sizePos;
+                    CoroutineHandler.RaiseEvent(GameHelperEvents.OnMoved);
+                }
+            }
+            finally
+            {
+                if (previous != IntPtr.Zero)
+                {
+                    SetThreadDpiAwarenessContext(previous);
+                }
             }
         }
 
+        private static readonly IntPtr DpiAwarenessContextPerMonitorAwareV2 = (IntPtr)(-4);
+
         [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")] private static extern IntPtr GetWindowDpiAwarenessContext(IntPtr hwnd);
+
+        [DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
 
         [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
 
