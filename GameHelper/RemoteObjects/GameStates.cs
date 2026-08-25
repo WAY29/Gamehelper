@@ -97,6 +97,7 @@ namespace GameHelper.RemoteObjects
                 {
                     this.myStaticObj = reader.ReadMemory<GameStateStaticOffset>(this.Address);
                     var data = reader.ReadMemory<GameStateOffset>(this.myStaticObj.GameState);
+                    this.AllStates.Clear();
                     for (var i = 0; i < GameStateHelper.TOTAL_STATES; i++)
                     {
                         this.AllStates[data.States[i].X] = (GameStateTypes)i;
@@ -104,19 +105,40 @@ namespace GameHelper.RemoteObjects
 
                     this.AreaLoading.Address = data.States[0].X;
                     this.InGameStateObject.Address = data.States[4].X;
+                    this.ApplyCurrentState(reader, data);
                 }
             }
             else
             {
                 // Caller (OnPerFrame) takes gameStatesLock around this call.
                 var data = reader.ReadMemory<GameStateOffset>(this.myStaticObj.GameState);
-                var cStateAddr = reader.ReadMemory<IntPtr>(data.CurrentStatePtr.Last - 0x10); // Get 2nd-last ptr.
-                if (cStateAddr != IntPtr.Zero && cStateAddr != this.currentStateAddress)
-                {
-                    this.currentStateAddress = cStateAddr;
-                    this.GameCurrentState = this.AllStates[this.currentStateAddress];
-                }
+                this.ApplyCurrentState(reader, data);
             }
+        }
+
+        private void ApplyCurrentState(SafeMemoryHandle reader, GameStateOffset data)
+        {
+            var states = data.CurrentStatePtr;
+            if (states.First == IntPtr.Zero ||
+                states.Last == IntPtr.Zero ||
+                states.TotalElements(IntPtr.Size) < 2)
+            {
+                return;
+            }
+
+            var cStateAddr = reader.ReadMemory<IntPtr>(states.Last - 0x10);
+            if (cStateAddr == IntPtr.Zero || cStateAddr == this.currentStateAddress)
+            {
+                return;
+            }
+
+            if (!this.AllStates.TryGetValue(cStateAddr, out var name))
+            {
+                return;
+            }
+
+            this.currentStateAddress = cStateAddr;
+            this.GameCurrentState = name;
         }
 
         /// <inheritdoc />
