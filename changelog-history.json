@@ -1,6 +1,13 @@
 {
     "releases": [
         {
+            "version": "1.4.14",
+            "published": "2026-08-26T00:42:09.548632+00:00",
+            "changelog": [
+                "Atlas2 map highlights match by MapId so CJK names no longer miss nodes"
+            ]
+        },
+        {
             "version": "1.4.13",
             "published": "2026-08-26T00:07:02.295257+00:00",
             "changelog": [
