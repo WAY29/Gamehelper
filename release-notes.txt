@@ -1,7 +1,1 @@
-CJK atlas names and loot-tag localization
-LootValue prices CJK currency by metadata id
-GameNotLoaded no longer latches until restart
-Overlay size follows the game window DPI
-Launcher Start now while checking updates
-RunecraftHelper map labels show item name; ≥1 divine in d (yellow)
-Radar toggle for Runestone socket-count labels
+RunecraftHelper Combinations overlay: ≥1 divine shows as d in yellow
