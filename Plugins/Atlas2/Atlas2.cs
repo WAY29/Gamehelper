@@ -1431,7 +1431,8 @@
             var needle = NormalizeName(value);
             if (string.IsNullOrEmpty(needle))
                 return false;
-            if (needle.Equals(node.MapName, StringComparison.OrdinalIgnoreCase))
+            if (needle.Equals(node.InternalId, StringComparison.OrdinalIgnoreCase) ||
+                needle.Equals(node.MapName, StringComparison.OrdinalIgnoreCase))
                 return true;
             return node.NameAliases != null &&
                    node.NameAliases.Any(alias => needle.Equals(alias, StringComparison.OrdinalIgnoreCase));
