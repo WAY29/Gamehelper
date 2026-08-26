@@ -1,6 +1,13 @@
 {
     "releases": [
         {
+            "version": "1.4.13",
+            "published": "2026-08-26T00:07:02.295257+00:00",
+            "changelog": [
+                "RunecraftHelper Combinations overlay: ≥1 divine shows as d in yellow"
+            ]
+        },
+        {
             "version": "1.4.12",
             "published": "2026-08-25T23:44:00.624490+00:00",
             "changelog": [
