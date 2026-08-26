@@ -1,1 +1,1 @@
-RunecraftHelper Combinations overlay: ≥1 divine shows as d in yellow
+Atlas2 map highlights match by MapId so CJK names no longer miss nodes
