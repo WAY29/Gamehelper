@@ -1,6 +1,14 @@
 {
     "releases": [
         {
+            "version": "1.4.15",
+            "published": "2026-08-26T00:55:18.068756+00:00",
+            "changelog": [
+                "RunecraftHelper rewards window keeps distance and hole info",
+                "Map value labels default to price only; optional reward name; 2px smaller"
+            ]
+        },
+        {
             "version": "1.4.14",
             "published": "2026-08-26T00:42:09.548632+00:00",
             "changelog": [
