@@ -299,17 +299,19 @@ namespace RunecraftHelper
                     uint col = this.PriceColor(v.Best, maxBest, out _);
                     string price = this.FormatRewardPrice(v.Best);
                     string text = price;
-                    if (!string.IsNullOrEmpty(v.BestReward))
+                    if (this.Settings.ShowMonolithRewardNameOnMap && !string.IsNullOrEmpty(v.BestReward))
                     {
                         text = v.BestCount > 1
                             ? $"{v.BestCount}x {v.BestReward} {price}"
                             : $"{v.BestReward} {price}";
                     }
-                    var ts = ImGui.CalcTextSize(text) * k;
+                    float pricePx = Math.Max(8f, fontPx - 2f);
+                    float priceK = pricePx / ambient;
+                    var ts = ImGui.CalcTextSize(text) * priceK;
                     var at = new Vector2(screen.X - (ts.X * 0.5f), priceTopY);
                     dl.AddRectFilled(at - pad, at + ts + pad, monoBg, 2f);
-                    dl.AddText(font, fontPx, at + new Vector2(1f, 1f), ColorShadow, text);
-                    dl.AddText(font, fontPx, at, col, text);
+                    dl.AddText(font, pricePx, at + new Vector2(1f, 1f), ColorShadow, text);
+                    dl.AddText(font, pricePx, at, col, text);
                 }
 
                 if (hasGlow)
@@ -392,7 +394,18 @@ namespace RunecraftHelper
 
                 foreach (var v in this.monolithViews)
                 {
-                    string hdr = $"{this.FormatRewardPrice(v.Best)}###m{v.EntityId}";
+                    string price = this.FormatRewardPrice(v.Best);
+                    // ▶ = Combinations panel open on this monolith (station+0xB8).
+                    string panelMark = v.PanelOpen ? "▶ " : string.Empty;
+                    string hdr;
+                    if (v.IsRerolled && v.Candidates.Count > 0)
+                        hdr = $"{panelMark}[locked] {v.Candidates[0].Reward}  ·  {v.Distance:F0}  ·  {price}###m{v.EntityId}";
+                    else if (v.IsUnique)
+                        hdr = $"{panelMark}Unique Monolith  ·  {v.HoleCount} holes  ·  {v.Distance:F0}  ·  best {price}###m{v.EntityId}";
+                    else if (v.AnchorIdx >= 0)
+                        hdr = $"{panelMark}{v.AnchorName}  ·  hole {v.AnchorPos + 1}/{v.HoleCount}  ·  {v.Distance:F0}  ·  best {price}###m{v.EntityId}";
+                    else
+                        hdr = $"{panelMark}(anchor ?)  ·  {v.HoleCount} holes  ·  {v.Distance:F0}###m{v.EntityId}";
 
                     uint hdrColor = this.PriceColor(v.Best, maxBest, out bool colorHdr);
                     if (colorHdr) ImGui.PushStyleColor(ImGuiCol.Text, hdrColor);

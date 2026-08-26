@@ -32,6 +32,7 @@
   "mono.highlight_threshold": "강조 임계값(ex)",
   "mono.highlight_threshold_hint": "최고 보상 가치로 모노리스 헤더에 색을 입힙니다: 임계값 이상은 초록,\n0.6×부터 임계값까지는 노랑, 그 미만은 없음. 0 = 끔(가격 색상 사용).",
   "mono.map_value_hint": "각 모노리스의 최고 가치(ex)를 큰 지도 오버레이에 그립니다",
+  "mono.show_name_on_map": "맵에 보상 이름 표시",
   "mono.draw_on_map": "지도 오버레이에 가치 표시",
   "mono.hide_map_when_panel": "조합 패널이 열려 있는 동안 지도 가치 숨기기",
   "mono.map_scale": "지도 가치 배율",

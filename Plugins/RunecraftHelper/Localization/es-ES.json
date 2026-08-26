@@ -32,6 +32,7 @@
   "mono.highlight_threshold": "Umbral de resaltado (ex)",
   "mono.highlight_threshold_hint": "Tiñe la cabecera de un monolito según su mejor recompensa: verde en/por encima del\numbral, amarillo de 0,6× hasta él, nada por debajo. 0 = desactivado (usar Color del precio).",
   "mono.map_value_hint": "Dibuja el mejor valor (ex) de cada monolito en la superposición del mapa grande",
+  "mono.show_name_on_map": "Mostrar nombre de recompensa en el mapa",
   "mono.draw_on_map": "Dibujar valor en la superposición del mapa",
   "mono.hide_map_when_panel": "Ocultar valores del mapa mientras el panel de combinaciones está abierto",
   "mono.map_scale": "Escala del valor en el mapa",

@@ -32,6 +32,7 @@
   "mono.highlight_threshold": "Seuil de surlignage (ex)",
   "mono.highlight_threshold_hint": "Teinte l'en-tête d'un monolithe selon sa meilleure récompense : vert au-dessus du\nseuil, jaune de 0,6× jusqu'au seuil, rien en dessous. 0 = désactivé (utiliser Couleur du prix).",
   "mono.map_value_hint": "Dessine la meilleure valeur (ex) de chaque monolithe sur la superposition de la grande carte",
+  "mono.show_name_on_map": "Afficher le nom de la récompense sur la carte",
   "mono.draw_on_map": "Dessiner la valeur sur la superposition de carte",
   "mono.hide_map_when_panel": "Masquer les valeurs de carte quand le panneau de combinaisons est ouvert",
   "mono.map_scale": "Échelle de la valeur sur la carte",

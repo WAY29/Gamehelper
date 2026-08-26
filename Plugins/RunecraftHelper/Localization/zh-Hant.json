@@ -33,6 +33,7 @@
   "mono.highlight_threshold_hint": "依最佳獎勵價值為石碑標題著色：達到／超過門檻為綠色，\n0.6× 到門檻之間為黃色，以下不著色。0 = 關閉（改用「價格顏色」）。",
   "mono.map_value_hint": "在大地圖疊層上繪製每個石碑的最佳價值（ex）",
   "mono.draw_on_map": "在地圖疊層上繪製價值",
+  "mono.show_name_on_map": "在地圖上顯示獎勵名稱",
   "mono.hide_map_when_panel": "組合面板開啟時隱藏地圖價值",
   "mono.map_scale": "地圖價值縮放",
   "mono.map_x": "地圖價值 X 偏移",

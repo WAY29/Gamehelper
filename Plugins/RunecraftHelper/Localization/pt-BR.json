@@ -32,6 +32,7 @@
   "mono.highlight_threshold": "Limiar de destaque (ex)",
   "mono.highlight_threshold_hint": "Tinge o cabeçalho de um monólito pela melhor recompensa: verde em/acima do\nlimiar, amarelo de 0,6× até ele, nada abaixo. 0 = desligado (usar Cor do preço).",
   "mono.map_value_hint": "Desenha o melhor valor (ex) de cada monólito na sobreposição do mapa grande",
+  "mono.show_name_on_map": "Mostrar nome da recompensa no mapa",
   "mono.draw_on_map": "Desenhar valor na sobreposição do mapa",
   "mono.hide_map_when_panel": "Ocultar valores do mapa enquanto o painel de combinações está aberto",
   "mono.map_scale": "Escala do valor no mapa",

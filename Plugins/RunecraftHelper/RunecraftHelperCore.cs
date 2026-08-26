@@ -277,6 +277,7 @@ namespace RunecraftHelper
                     ImGui.Checkbox(this.L("mono.draw_on_map", "Draw value on map overlay"), ref this.Settings.DrawMonolithValueOnMap);
                     if (this.Settings.DrawMonolithValueOnMap)
                     {
+                        ImGui.Checkbox(this.L("mono.show_name_on_map", "Show reward name on map"), ref this.Settings.ShowMonolithRewardNameOnMap);
                         ImGui.Checkbox(this.L("mono.hide_map_when_panel", "Hide map values while Combinations panel open"), ref this.Settings.HideMapValueWhenPanelOpen);
                         ImGui.SliderFloat(this.L("mono.map_scale", "Map value scale"), ref this.Settings.MapValueScaleMultiplier, 0.1f, 3f, "%.2f");
                         ImGui.SliderFloat(this.L("mono.map_x", "Map value X offset"), ref this.Settings.MapValueXOffset, -200f, 200f, "%.0f");

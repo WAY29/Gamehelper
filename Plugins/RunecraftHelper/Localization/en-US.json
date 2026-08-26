@@ -33,6 +33,7 @@
   "mono.highlight_threshold_hint": "Tints a monolith's header by its best reward value: green at/above the\nthreshold, yellow from 0.6× up to it, none below. 0 = off (use Price color).",
   "mono.map_value_hint": "Paints each monolith's best value (ex) on the large-map overlay",
   "mono.draw_on_map": "Draw value on map overlay",
+  "mono.show_name_on_map": "Show reward name on map",
   "mono.hide_map_when_panel": "Hide map values while Combinations panel open",
   "mono.map_scale": "Map value scale",
   "mono.map_x": "Map value X offset",

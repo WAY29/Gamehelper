@@ -91,6 +91,9 @@ namespace RunecraftHelper
         // map position (the same place Radar shows the socket count). Tinted by MonolithHighlightThreshold.
         public bool DrawMonolithValueOnMap = false;
 
+        // On-map label includes the best reward name next to the price. Off = price only.
+        public bool ShowMonolithRewardNameOnMap = false;
+
         // Hide the on-map value labels while the in-game Runeshape Combinations panel is open (the same
         // panel the recipe overlay reads). Avoids cluttering the map with summary prices while the player
         // is reading the panel + its per-recipe overlay. On by default.
