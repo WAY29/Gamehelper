@@ -1,1 +1,2 @@
-Atlas2 map highlights match by MapId so CJK names no longer miss nodes
+RunecraftHelper rewards window keeps distance and hole info
+Map value labels default to price only; optional reward name; 2px smaller
