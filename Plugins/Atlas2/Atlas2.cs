@@ -1742,10 +1742,8 @@
 
             foreach (var (english, display) in AreaLocalization.UniqueNames(Settings.MapNameLanguage))
             {
-                if (HasMap(category, english))
-                    continue;
-                if (display.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0 &&
-                    english.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0)
+                if (HasMap(category, english) ||
+                    display.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0)
                     continue;
                 mapPickHits.Add((english, display));
             }
@@ -1759,11 +1757,9 @@
 
         private static int MapPickScore((string English, string Display) hit, string query)
         {
-            if (hit.Display.Equals(query, StringComparison.OrdinalIgnoreCase) ||
-                hit.English.Equals(query, StringComparison.OrdinalIgnoreCase))
+            if (hit.Display.Equals(query, StringComparison.OrdinalIgnoreCase))
                 return 0;
-            if (hit.Display.StartsWith(query, StringComparison.OrdinalIgnoreCase) ||
-                hit.English.StartsWith(query, StringComparison.OrdinalIgnoreCase))
+            if (hit.Display.StartsWith(query, StringComparison.OrdinalIgnoreCase))
                 return 1;
             return 2;
         }
