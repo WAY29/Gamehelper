@@ -11,11 +11,16 @@ namespace Atlas2
     {
         private static Dictionary<string, Locale> byId = new(StringComparer.OrdinalIgnoreCase);
         private static Dictionary<string, Locale> byAny = new(StringComparer.OrdinalIgnoreCase);
+        private static List<(string English, string Display)> uniqueNames = [];
+        private static int uniqueLang = int.MinValue;
+        private static OverlayLanguage uniqueOverlay;
 
         public static void Load(string pluginDirectory)
         {
             byId = new Dictionary<string, Locale>(StringComparer.OrdinalIgnoreCase);
             byAny = new Dictionary<string, Locale>(StringComparer.OrdinalIgnoreCase);
+            uniqueNames = [];
+            uniqueLang = int.MinValue;
             var path = Path.Combine(pluginDirectory, "json", "area-localization.json");
             if (!File.Exists(path))
             {
@@ -79,6 +84,52 @@ namespace Atlas2
                 _ => loc.En,
             };
             return string.IsNullOrWhiteSpace(name) ? fallback : name;
+        }
+
+        public static IReadOnlyList<(string English, string Display)> UniqueNames(int language)
+        {
+            var overlay = OverlayLocalization.CurrentLanguage;
+            if (uniqueNames.Count > 0 && uniqueLang == language && uniqueOverlay == overlay)
+            {
+                return uniqueNames;
+            }
+
+            uniqueLang = language;
+            uniqueOverlay = overlay;
+            uniqueNames = [];
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in byId)
+            {
+                var english = string.IsNullOrWhiteSpace(kv.Value.En) ? kv.Key : kv.Value.En;
+                if (!seen.Add(english))
+                {
+                    continue;
+                }
+
+                uniqueNames.Add((english, DisplayName(kv.Key, english, language)));
+            }
+
+            uniqueNames.Sort((a, b) => string.Compare(a.Display, b.Display, StringComparison.CurrentCultureIgnoreCase));
+            return uniqueNames;
+        }
+
+        public static bool MatchesQuery(string mapIdOrEnglish, string query)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return false;
+            }
+
+            query = query.Trim();
+            foreach (var alias in Aliases(mapIdOrEnglish, mapIdOrEnglish))
+            {
+                if (alias.Contains(query, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public static IEnumerable<string> Aliases(string mapId, string fallback)

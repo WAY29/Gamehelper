@@ -36,6 +36,10 @@
 
         private string SettingPathname => Path.Join(DllDirectory, "config", "settings.txt");
         private string NewGroupName = string.Empty;
+        private const int MapPickDebounceMs = 150;
+        private int mapPickGroup = -1;
+        private long mapPickDue;
+        private readonly List<(string English, string Display)> mapPickHits = [];
 
         private static readonly Dictionary<string, ContentInfo> MapTags = [];
         private static readonly Dictionary<string, ContentInfo> MapPlain = [];
@@ -1381,7 +1385,8 @@
         private static bool MatchesCategory(MapGroupSettings category, NodeData node, string mapName,
             bool searchActive, bool matchesSearch)
         {
-            if (category.Maps.Any(map => AliasEquals(node, map) || NormalizeName(map).Equals(mapName, StringComparison.OrdinalIgnoreCase)))
+            if (category.Maps.Any(map => CustomMapEnabled(category, map) &&
+                (AliasEquals(node, map) || NormalizeName(map).Equals(mapName, StringComparison.OrdinalIgnoreCase))))
                 return true;
 
             bool Enabled(string label) => category.BuiltInTargets.TryGetValue(label, out var enabled) && enabled;
@@ -1587,9 +1592,16 @@
                         ImGui.InputText("Category name", ref category.Name, 256);
                     }
 
+                    category.Maps ??= [];
+                    category.MapEnabled ??= [];
+                    var customMaps = new HashSet<string>(
+                        category.Maps.Where(map => !string.IsNullOrWhiteSpace(map)),
+                        StringComparer.OrdinalIgnoreCase);
                     var targetNames = category.BuiltInTargets.Keys.ToList();
                     foreach (var target in targetNames)
                     {
+                        if (customMaps.Contains(target))
+                            continue;
                         bool enabled = category.BuiltInTargets[target];
                         var label = AreaLocalization.DisplayName(target, target, Settings.MapNameLanguage);
                         if (ImGui.Checkbox($"{label}##fixed{target}", ref enabled)) category.BuiltInTargets[target] = enabled;
@@ -1598,17 +1610,29 @@
                     for (int j = 0; j < category.Maps.Count; j++)
                     {
                         var map = category.Maps[j];
-                        var shown = AreaLocalization.DisplayName(map, map, Settings.MapNameLanguage);
-                        ImGui.SetNextItemWidth(260);
-                        if (ImGui.InputTextWithHint($"##map{j}", shown, ref map, 256)) category.Maps[j] = map;
+                        if (string.IsNullOrWhiteSpace(map))
+                        {
+                            category.Maps.RemoveAt(j);
+                            break;
+                        }
+
+                        bool enabled = !category.MapEnabled.TryGetValue(map, out var on) || on;
+                        var label = AreaLocalization.DisplayName(map, map, Settings.MapNameLanguage);
+                        if (ImGui.Checkbox($"{label}##map{j}", ref enabled))
+                            category.MapEnabled[map] = enabled;
                         ImGui.SameLine();
-                        if (ImGui.SmallButton($"Remove##map{j}")) { category.Maps.RemoveAt(j); break; }
+                        if (ImGui.SmallButton($"x##map{j}"))
+                        {
+                            category.Maps.RemoveAt(j);
+                            category.MapEnabled.Remove(map);
+                            break;
+                        }
                     }
-                    if (ImGui.SmallButton("Add map")) category.Maps.Add(string.Empty);
+
+                    DrawMapAdd(category, i);
 
                     if (string.IsNullOrEmpty(category.BuiltInKey))
                     {
-                        ImGui.SameLine();
                         if (ImGui.SmallButton("Delete category"))
                         {
                             Settings.MapGroups.RemoveAt(i);
@@ -1631,6 +1655,163 @@
                 Settings.MapGroups.Add(new MapGroupSettings(Settings.GroupNameInput.Trim(), Settings.DefaultBackgroundColor, Settings.DefaultFontColor));
                 Settings.GroupNameInput = string.Empty;
             }
+        }
+
+        private static bool CustomMapEnabled(MapGroupSettings category, string map)
+        {
+            if (string.IsNullOrWhiteSpace(map))
+                return false;
+            return category.MapEnabled == null || !category.MapEnabled.TryGetValue(map, out var enabled) || enabled;
+        }
+
+        private void DrawMapAdd(MapGroupSettings category, int groupIndex)
+        {
+            category.MapNameInput ??= string.Empty;
+            category.Maps ??= [];
+            ImGui.SetNextItemWidth(260);
+            bool enter = ImGui.InputTextWithHint("##addMap", "type to add map…", ref category.MapNameInput, 256,
+                ImGuiInputTextFlags.EnterReturnsTrue);
+            bool edited = ImGui.IsItemEdited();
+            bool active = ImGui.IsItemActive();
+            long now = Environment.TickCount64;
+            string query = category.MapNameInput?.Trim() ?? string.Empty;
+
+            if (active && mapPickGroup != groupIndex)
+            {
+                mapPickGroup = groupIndex;
+                mapPickDue = now;
+            }
+
+            if (query.Length == 0)
+            {
+                if (mapPickGroup == groupIndex)
+                {
+                    mapPickHits.Clear();
+                    mapPickDue = 0;
+                }
+            }
+            else if (edited)
+            {
+                mapPickGroup = groupIndex;
+                mapPickDue = now + MapPickDebounceMs;
+            }
+
+            if (mapPickGroup != groupIndex)
+                return;
+
+            if (enter)
+            {
+                RefreshMapPickHits(category, query);
+                if (mapPickHits.Count > 0)
+                    CommitMapPick(category, mapPickHits[0].English);
+                return;
+            }
+
+            if (mapPickDue != 0 && now >= mapPickDue)
+            {
+                RefreshMapPickHits(category, query);
+                mapPickDue = 0;
+            }
+
+            if (mapPickHits.Count == 0)
+                return;
+
+            float row = ImGui.GetTextLineHeightWithSpacing();
+            float height = Math.Min(row * 8f, row * mapPickHits.Count + 4f);
+            if (!ImGui.BeginListBox("##mapHits", new Vector2(260, height)))
+                return;
+            string picked = null;
+            foreach (var hit in mapPickHits)
+            {
+                if (ImGui.Selectable(hit.Display))
+                {
+                    picked = hit.English;
+                    break;
+                }
+            }
+            ImGui.EndListBox();
+            if (picked != null)
+                CommitMapPick(category, picked);
+        }
+
+        private void RefreshMapPickHits(MapGroupSettings category, string query)
+        {
+            mapPickHits.Clear();
+            if (string.IsNullOrEmpty(query))
+                return;
+
+            foreach (var (english, display) in AreaLocalization.UniqueNames(Settings.MapNameLanguage))
+            {
+                if (HasMap(category, english) || !AreaLocalization.MatchesQuery(english, query))
+                    continue;
+                mapPickHits.Add((english, display));
+            }
+
+            mapPickHits.Sort((a, b) =>
+            {
+                int cmp = MapPickScore(a, query).CompareTo(MapPickScore(b, query));
+                return cmp != 0 ? cmp : string.Compare(a.Display, b.Display, StringComparison.CurrentCultureIgnoreCase);
+            });
+        }
+
+        private static int MapPickScore((string English, string Display) hit, string query)
+        {
+            if (hit.Display.Equals(query, StringComparison.OrdinalIgnoreCase) ||
+                hit.English.Equals(query, StringComparison.OrdinalIgnoreCase))
+                return 0;
+            if (hit.Display.StartsWith(query, StringComparison.OrdinalIgnoreCase) ||
+                hit.English.StartsWith(query, StringComparison.OrdinalIgnoreCase))
+                return 1;
+            return 2;
+        }
+
+        private void CommitMapPick(MapGroupSettings category, string english)
+        {
+            if (!string.IsNullOrWhiteSpace(english) && !HasMap(category, english))
+                category.Maps.Add(english);
+            category.MapNameInput = string.Empty;
+            mapPickHits.Clear();
+            mapPickDue = 0;
+        }
+
+        private static bool HasMap(MapGroupSettings category, string name)
+        {
+            if (category.Maps != null)
+            {
+                foreach (var map in category.Maps)
+                {
+                    if (MapKeyEquals(map, name))
+                        return true;
+                }
+            }
+
+            if (category.BuiltInTargets != null)
+            {
+                foreach (var key in category.BuiltInTargets.Keys)
+                {
+                    if (MapKeyEquals(key, name))
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool MapKeyEquals(string a, string b)
+        {
+            var left = NormalizeName(a);
+            var right = NormalizeName(b);
+            if (string.IsNullOrEmpty(left) || string.IsNullOrEmpty(right))
+                return false;
+            if (left.Equals(right, StringComparison.OrdinalIgnoreCase))
+                return true;
+            foreach (var alias in AreaLocalization.Aliases(a, a))
+            {
+                if (NormalizeName(alias).Equals(right, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
 
         [DllImport("user32.dll")]

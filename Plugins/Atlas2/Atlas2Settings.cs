@@ -183,6 +183,7 @@ namespace Atlas2
         public string BuiltInKey = string.Empty;
         public Dictionary<string, bool> BuiltInTargets = [];
         public List<string> Maps = [];
+        public Dictionary<string, bool> MapEnabled = [];
         public string MapNameInput = string.Empty;
     }
 
