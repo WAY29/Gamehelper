@@ -12,6 +12,8 @@ namespace StashUtility
         public bool EnableTabletUI = true;
         public bool DisableBadTabletHighlight = false;
         public bool ShowOverlayInBackground = false;
+        /// <summary>0 overlay, 1 English, 2 zh-CN, 3 zh-Hant.</summary>
+        public int AffixLanguage = 0;
 
         // UI path for the waystone stash tab
         public string PathString = "2,0,0,0,1,1,45,0,1";

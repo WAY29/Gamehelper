@@ -1,6 +1,7 @@
 namespace StashUtility
 {
     using GameHelper;
+    using GameHelper.Localization;
     using GameHelper.Plugin;
     using GameHelper.RemoteEnums;
     using GameHelper.RemoteObjects.Components;
@@ -191,6 +192,22 @@ namespace StashUtility
 
         public override void DrawSettings()
         {
+            var affixLang = Math.Clamp(this.Settings.AffixLanguage, 0, 3);
+            var affixLangNames = new[]
+            {
+                this.PluginText.T("stashutility.affix_lang.overlay", "Follow overlay"),
+                "English",
+                "简体中文",
+                "繁體中文",
+            };
+            ImGui.SetNextItemWidth(220f);
+            if (ImGui.Combo(this.PluginText.T("stashutility.affix_lang", "Affix language"), ref affixLang, affixLangNames, affixLangNames.Length))
+            {
+                this.Settings.AffixLanguage = affixLang;
+                this.affixLangCache = null;
+            }
+            ImGuiHelper.ToolTip(this.PluginText.T("stashutility.affix_lang_tooltip", "Language for waystone/tablet affix names. Use the same language as the game client."));
+
             ImGui.Checkbox(PluginText.T("stashutility.show_in_bg", "Show Overlay When Game in Background"), ref Settings.ShowOverlayInBackground);
             ImGuiHelper.ToolTip(PluginText.T("stashutility.show_in_bg_tooltip", "If checked, the waystone highlights will remain visible even when the game window is in the background."));
 
@@ -603,13 +620,13 @@ namespace StashUtility
                     {
                         ImGui.InputTextWithHint("##searchWaystone", PluginText.T("stashutility.search_database", "Search database..."), ref waystoneSearchTerm, 64);
                         var filtered = Data.ModDatabase.AllWaystoneMods
-                            .Where(m => m.Name.Contains(waystoneSearchTerm, StringComparison.OrdinalIgnoreCase) ||
+                            .Where(m => this.ModLabel(m.Id, m.Name).Contains(waystoneSearchTerm, StringComparison.OrdinalIgnoreCase) ||
                                         m.Id.Contains(waystoneSearchTerm, StringComparison.OrdinalIgnoreCase))
                             .ToList();
 
                         foreach (var mod in filtered)
                         {
-                            if (ImGui.Selectable($"{mod.Name}##{mod.Id}"))
+                            if (ImGui.Selectable($"{this.ModLabel(mod.Id, mod.Name)}##{mod.Id}"))
                             {
                                 if (!Settings.BadModPatterns.Contains(mod.Id) && !Settings.GoodModPatterns.Contains(mod.Id))
                                 {
@@ -744,7 +761,7 @@ namespace StashUtility
                                 var tabMods = Data.ModDatabase.AllTabletMods.Where(kvp.Value).ToList();
                                 
                                 ImGui.InputTextWithHint($"##search{kvp.Key}", PluginText.F("stashutility.tablet.search_category", "Search {0} Mods...", kvp.Key), ref tabletSearchTerm, 64);
-                                var filtered = tabMods.Where(m => m.Name.Contains(tabletSearchTerm, StringComparison.OrdinalIgnoreCase) || m.Id.Contains(tabletSearchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+                                var filtered = tabMods.Where(m => this.ModLabel(m.Id, m.Name).Contains(tabletSearchTerm, StringComparison.OrdinalIgnoreCase) || m.Id.Contains(tabletSearchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
 
                                 if (ImGui.BeginChild($"Child{kvp.Key}", new Vector2(0, 250), ImGuiChildFlags.Borders))
                                 {
@@ -754,7 +771,8 @@ namespace StashUtility
                                         bool isBad = Settings.TabletBadModPatterns.Contains(mod.Id);
                                         bool isGod = Settings.TabletGodModPatterns.Contains(mod.Id);
 
-                                        ImGui.TextWrapped(mod.Name.Replace("%", "%%"));
+                                        var label = this.ModLabel(mod.Id, mod.Name);
+                                        ImGui.TextWrapped(label.Replace("%", "%%"));
 
                                         if (ImGui.Checkbox(PluginText.Label("stashutility.tablet.good", "Good", $"g_{mod.Id}"), ref isGood))
                                         {
@@ -786,7 +804,7 @@ namespace StashUtility
                                             ImGui.Indent(20f);
                                             int intRoll = (int)requiredRoll;
                                             ImGui.SetNextItemWidth(150f);
-                                            string formatStr = mod.Name.Contains("%") ? "%d%%" : "%d";
+                                            string formatStr = label.Contains("%") ? "%d%%" : "%d";
                                             if (ImGui.SliderInt($"Req. Min Roll##min_{mod.Id}", ref intRoll, (int)mod.MinRoll, (int)mod.MaxRoll, formatStr))
                                             {
                                                 Settings.TabletModRequiredMinRolls[mod.Id] = (float)intRoll;
@@ -1745,7 +1763,8 @@ namespace StashUtility
             var path = item.Path;
 
             bool isWaystone = (!string.IsNullOrEmpty(name) && name.Contains("Waystone")) || path.Contains("MapKey") || path.Contains("Waystone");
-            bool isTablet = (!string.IsNullOrEmpty(name) && name.Contains("Tablet")) || path.Contains("TowerAugment") || path.Contains("Tablet");
+            bool isTablet = path.Contains("TowerAugment") || path.Contains("Tablet") ||
+                (!string.IsNullOrEmpty(name) && (name.Contains("Tablet") || name.Contains("石板") || name.Contains("碑牌")));
 
             if (!isWaystone && !isTablet) return;
 
@@ -1773,17 +1792,7 @@ namespace StashUtility
             int tier = 0;
             if (isWaystone)
             {
-                var tierMatch = System.Text.RegularExpressions.Regex.Match(name, @"Tier\s*(\d+)");
-                if (tierMatch.Success && int.TryParse(tierMatch.Groups[1].Value, out var parsedTier))
-                {
-                    tier = parsedTier;
-                }
-                else
-                {
-                    var pathMatch = System.Text.RegularExpressions.Regex.Match(path, @"Waystone(\d+)");
-                    if (pathMatch.Success) int.TryParse(pathMatch.Groups[1].Value, out tier);
-                }
-
+                tier = ParseWaystoneTier(name, path, baseComponent.InternalName);
                 if (tier < Settings.MinTier) return;
             }
 
@@ -2074,6 +2083,62 @@ namespace StashUtility
             }
         }
 
+        private Dictionary<string, string> affixLangCache;
+        private int affixLangCacheFor = int.MinValue;
+
+        private string AffixLangFile()
+        {
+            return Math.Clamp(this.Settings.AffixLanguage, 0, 3) switch
+            {
+                1 => "en-US",
+                2 => "zh-CN",
+                3 => "zh-Hant",
+                _ => OverlayLocalization.LanguageCodes(OverlayLocalization.CurrentLanguage)[0],
+            };
+        }
+
+        private Dictionary<string, string> AffixStrings()
+        {
+            var lang = this.AffixLangFile();
+            if (this.affixLangCache != null && this.affixLangCacheFor == this.Settings.AffixLanguage
+                && string.Equals(lang, this.affixLangFileCached, StringComparison.Ordinal))
+            {
+                return this.affixLangCache;
+            }
+
+            this.affixLangFileCached = lang;
+            this.affixLangCacheFor = this.Settings.AffixLanguage;
+            this.affixLangCache = new Dictionary<string, string>(StringComparer.Ordinal);
+            var path = Path.Combine(this.DllDirectory, "Localization", lang + ".json");
+            if (File.Exists(path))
+            {
+                try
+                {
+                    this.affixLangCache = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(path))
+                        ?? new Dictionary<string, string>(StringComparer.Ordinal);
+                }
+                catch
+                {
+                    // keep empty, fall back to catalog English
+                }
+            }
+
+            return this.affixLangCache;
+        }
+
+        private string affixLangFileCached = string.Empty;
+
+        private string ModLabel(string id, string fallback)
+        {
+            var key = $"stashutility.mod.{id}";
+            if (this.AffixStrings().TryGetValue(key, out var value) && !string.IsNullOrEmpty(value))
+            {
+                return value;
+            }
+
+            return this.PluginText.T(key, fallback);
+        }
+
         private void DrawModListUI(string title, List<string> currentList, List<string> targetList, Vector4 color, bool isCurrentlyBad)
         {
             ImGui.TextColored(color, title);
@@ -2084,7 +2149,7 @@ namespace StashUtility
                 string id = currentList[i];
                 var defW = Data.ModDatabase.AllWaystoneMods.FirstOrDefault(m => m.Id == id);
                 var defT = Data.ModDatabase.AllTabletMods.FirstOrDefault(m => m.Id == id);
-                string name = defW?.Name ?? defT?.Name ?? id;
+                string name = this.ModLabel(id, defW?.Name ?? defT?.Name ?? id);
 
                 ImGui.PushID(title + id);
                 if (ImGui.Button("X"))
@@ -2217,6 +2282,28 @@ namespace StashUtility
             {
                 return val;
             }
+            return 0;
+        }
+
+        private static int ParseWaystoneTier(string name, string path, string internalName)
+        {
+            foreach (var text in new[] { internalName, path, name })
+            {
+                if (string.IsNullOrEmpty(text))
+                {
+                    continue;
+                }
+
+                var match = System.Text.RegularExpressions.Regex.Match(
+                    text,
+                    @"(?:MapKeyTier|Waystone(?:Tier)?|Tier|階級|阶级)\s*(\d+)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (match.Success && int.TryParse(match.Groups[1].Value, out var tier))
+                {
+                    return tier;
+                }
+            }
+
             return 0;
         }
 
