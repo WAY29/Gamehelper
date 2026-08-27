@@ -1742,7 +1742,10 @@
 
             foreach (var (english, display) in AreaLocalization.UniqueNames(Settings.MapNameLanguage))
             {
-                if (HasMap(category, english) || !AreaLocalization.MatchesQuery(english, query))
+                if (HasMap(category, english))
+                    continue;
+                if (display.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0 &&
+                    english.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0)
                     continue;
                 mapPickHits.Add((english, display));
             }

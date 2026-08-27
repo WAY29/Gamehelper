@@ -113,25 +113,6 @@ namespace Atlas2
             return uniqueNames;
         }
 
-        public static bool MatchesQuery(string mapIdOrEnglish, string query)
-        {
-            if (string.IsNullOrWhiteSpace(query))
-            {
-                return false;
-            }
-
-            query = query.Trim();
-            foreach (var alias in Aliases(mapIdOrEnglish, mapIdOrEnglish))
-            {
-                if (alias.Contains(query, StringComparison.OrdinalIgnoreCase))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         public static IEnumerable<string> Aliases(string mapId, string fallback)
         {
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
