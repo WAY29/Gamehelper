@@ -6,6 +6,7 @@ namespace GameHelper
 {
     using System;
     using System.Collections.Generic;
+    using System.Runtime.InteropServices;
     using System.Threading.Tasks;
     using ClickableTransparentOverlay;
     using Coroutine;
@@ -80,6 +81,10 @@ namespace GameHelper
         /// <inheritdoc />
         protected override void Render()
         {
+            // ClickableTransparentOverlay.PumpEvents peeks one Win32 message per frame.
+            // CJK IMEs enqueue a burst (WM_IME_* + WM_CHAR); draining here keeps typing responsive.
+            DrainWin32Messages();
+
             PerformanceProfiler.StartFrame();
 
             try { CoroutineHandler.Tick(ImGui.GetIO().DeltaTime); }
@@ -113,6 +118,41 @@ namespace GameHelper
                     (Core.GHSettings.FixTaskbarNotShowing ?
                         new System.Drawing.Size(0, 1) :
                         System.Drawing.Size.Empty);
+            }
+        }
+
+        private const uint PmRemove = 1;
+        private const int MaxDrainPerFrame = 256;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeMessage
+        {
+            public IntPtr Handle;
+            public uint Message;
+            public UIntPtr WParam;
+            public IntPtr LParam;
+            public uint Time;
+            public int X;
+            public int Y;
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "PeekMessageW")]
+        private static extern bool PeekMessage(out NativeMessage msg, IntPtr hwnd, uint min, uint max, uint remove);
+
+        [DllImport("user32.dll")]
+        private static extern bool TranslateMessage(ref NativeMessage msg);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr DispatchMessage(ref NativeMessage msg);
+
+        private static void DrainWin32Messages()
+        {
+            for (int i = 0; i < MaxDrainPerFrame; i++)
+            {
+                if (!PeekMessage(out var msg, IntPtr.Zero, 0, 0, PmRemove))
+                    break;
+                TranslateMessage(ref msg);
+                DispatchMessage(ref msg);
             }
         }
     }
