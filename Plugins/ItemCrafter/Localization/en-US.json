@@ -10,6 +10,7 @@
   "settings.new_recipe": "New recipe",
   "settings.recipe_name": "Name",
   "settings.target": "Items",
+  "settings.pick_hint": "Select a stash item as the target",
   "settings.add_target": "Add item",
   "settings.steps": "Steps",
   "settings.add_step": "Add step",

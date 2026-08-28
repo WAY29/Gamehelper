@@ -68,7 +68,14 @@ namespace ItemCrafter
 
         private Item? lastHovered;
         private Slot? lastHoveredSlot;
+        private Slot? pickedSlot;
+        private string pickedName = string.Empty;
+        private bool pickingSlot;
+        private long pickArmedAtMs;
         private bool freezeHover;
+        private static readonly FieldInfo? SettingsVisibleField =
+            typeof(Core).Assembly.GetType("GameHelper.Settings.SettingsWindow")
+                ?.GetField("isSettingsWindowVisible", BindingFlags.NonPublic | BindingFlags.Static);
         private int dragStep = -1;
         private byte[]? cleanBase;
         private byte[]? cleanMods;
@@ -228,6 +235,7 @@ namespace ItemCrafter
         public override void OnDisable()
         {
             this.Stop("插件关闭");
+            this.ClearPicked();
             this.SaveSettings();
         }
 
@@ -372,8 +380,24 @@ namespace ItemCrafter
                 ImGui.PopID();
             }
 
+            if (!string.IsNullOrEmpty(this.pickedName))
+            {
+                ImGui.AlignTextToFramePadding();
+                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1f, 0.55f, 0.1f, 1f));
+                ImGui.BulletText(this.pickedName);
+                ImGui.PopStyleColor();
+                ImGui.SameLine();
+                if (this.IconButton("##clearPick", DrawXIcon))
+                {
+                    this.ClearPicked();
+                }
+            }
+
             ImGui.SetNextItemWidth(220);
-            if (ImGui.BeginCombo("##addTarget", this.PluginText.T("settings.add_target", "Add item")))
+            var comboLabel = string.IsNullOrEmpty(this.pickedName)
+                ? this.PluginText.T("settings.add_target", "Add item")
+                : this.pickedName;
+            if (ImGui.BeginCombo("##addTarget", comboLabel))
             {
                 for (var i = 0; i < Catalog.Targets.Length; i++)
                 {
@@ -385,11 +409,24 @@ namespace ItemCrafter
 
                     if (ImGui.Selectable(this.TargetLabels()[i]))
                     {
+                        this.ClearPicked();
                         recipe.TargetIds.Add(row.Id);
                     }
                 }
 
                 ImGui.EndCombo();
+            }
+
+            ImGui.SameLine();
+            if (this.IconButton("##pickSlot", DrawTargetIcon))
+            {
+                this.BeginPick();
+            }
+
+            if (this.pickingSlot)
+            {
+                ImGui.SameLine();
+                ImGui.TextDisabled(this.PluginText.T("settings.pick_hint", "选择仓库中的物品为目标"));
             }
         }
 
@@ -717,6 +754,15 @@ namespace ItemCrafter
             dl.AddLine(new Vector2(c.X, c.Y - r), new Vector2(c.X, c.Y + r), col, 2f);
         }
 
+        private static void DrawTargetIcon(ImDrawListPtr dl, Vector2 min, Vector2 max, uint col)
+        {
+            var c = (min + max) * 0.5f;
+            var r = (max.X - min.X) * 0.22f;
+            dl.AddCircle(c, r, col, 12, 1.5f);
+            dl.AddLine(new Vector2(c.X - r - 2f, c.Y), new Vector2(c.X + r + 2f, c.Y), col, 1.5f);
+            dl.AddLine(new Vector2(c.X, c.Y - r - 2f), new Vector2(c.X, c.Y + r + 2f), col, 1.5f);
+        }
+
         private static void DrawXIcon(ImDrawListPtr dl, Vector2 min, Vector2 max, uint col)
         {
             var pad = (max.X - min.X) * 0.28f;
@@ -761,9 +807,14 @@ namespace ItemCrafter
 
             try
             {
-                if (!this.running && this.Settings.ShowDebugWindow)
+                if (!this.running && (this.Settings.ShowDebugWindow || this.pickingSlot || this.pickedSlot != null))
                 {
                     this.ScanPanels();
+                }
+
+                if (this.pickingSlot)
+                {
+                    this.TickPick();
                 }
 
                 if (this.running)
@@ -772,9 +823,13 @@ namespace ItemCrafter
                     this.DrawHighlights();
                 }
 
-                if (this.Settings.ShowDebugWindow)
+                if (this.Settings.ShowDebugWindow || this.pickingSlot || this.pickedSlot != null)
                 {
                     this.DrawHoverRect();
+                }
+
+                if (this.Settings.ShowDebugWindow)
+                {
                     this.DrawDebugWindow();
                 }
 
@@ -1146,6 +1201,7 @@ namespace ItemCrafter
             {
                 this.ScanStash();
                 this.ScanInv();
+                this.RebindPicked();
                 var op = this.ops[this.stepIndex];
                 var step = op.Step;
                 if (!Catalog.TryGet(step.InternalName, out var info))
@@ -1199,8 +1255,19 @@ namespace ItemCrafter
                 var targets = new List<Slot>();
                 foreach (var stone in this.stashSlots)
                 {
-                    if (!Catalog.MatchesAny(recipe.TargetIds, stone.Path, stone.InternalName, stone.DisplayName) ||
-                        !Catalog.CanApply(info, stone.Path) ||
+                    if (this.pickedSlot != null)
+                    {
+                        if (stone.El != this.pickedSlot.El && !Contains(stone, Center(this.pickedSlot)))
+                        {
+                            continue;
+                        }
+                    }
+                    else if (!Catalog.MatchesAny(recipe.TargetIds, stone.Path, stone.InternalName, stone.DisplayName))
+                    {
+                        continue;
+                    }
+
+                    if (!Catalog.CanApply(info, stone.Path) ||
                         !this.Passes(op, stone) ||
                         !Catalog.IsEligible(info.Kind, stone.Rarity, stone.ExplicitCount, stone.Corrupted, step.UntilAffixes, stone.Quality, stone.Identified))
                     {
@@ -1334,12 +1401,23 @@ namespace ItemCrafter
         private void DrawHoverRect()
         {
             var dl = ImGui.GetForegroundDrawList();
-            foreach (var slot in this.stashSlots)
+            if (this.Settings.ShowDebugWindow || this.pickingSlot)
             {
-                dl.AddRect(slot.Pos, slot.Pos + slot.Size, 0xFFFFFF00, 0f, ImDrawFlags.None, 2f);
+                foreach (var slot in this.stashSlots)
+                {
+                    dl.AddRect(slot.Pos, slot.Pos + slot.Size, 0xFFFFFF00, 0f, ImDrawFlags.None, 2f);
+                }
             }
 
-            if (this.lastHoveredSlot is { } s)
+            if (this.pickedSlot is { } picked)
+            {
+                dl.AddRect(picked.Pos, picked.Pos + picked.Size, 0xFF0080FF, 0f, ImDrawFlags.None, 3f);
+            }
+            else if (this.pickingSlot && this.lastHoveredSlot is { } hover)
+            {
+                dl.AddRect(hover.Pos, hover.Pos + hover.Size, 0xFF0080FF, 0f, ImDrawFlags.None, 3f);
+            }
+            else if (this.lastHoveredSlot is { } s)
             {
                 dl.AddRect(s.Pos, s.Pos + s.Size, 0xFF00FF00, 0f, ImDrawFlags.None, 3f);
             }
@@ -1349,7 +1427,89 @@ namespace ItemCrafter
         {
             this.ScanStash();
             this.ScanInv();
+            this.RebindPicked();
             this.RefreshHover();
+        }
+
+        private void BeginPick()
+        {
+            this.ClearPicked();
+            this.lastHovered = null;
+            this.lastHoveredSlot = null;
+            this.pickingSlot = true;
+            this.pickArmedAtMs = Environment.TickCount64 + 150;
+            SetSettingsVisible(false);
+        }
+
+        private void TickPick()
+        {
+            ImGui.GetIO().WantCaptureMouse = true;
+            if (Environment.TickCount64 < this.pickArmedAtMs)
+            {
+                return;
+            }
+
+            if (Utils.IsKeyPressedAndNotTimeout(VK.ESCAPE, 300))
+            {
+                this.pickingSlot = false;
+                SetSettingsVisible(true);
+                return;
+            }
+
+            if (!ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+            {
+                return;
+            }
+
+            if (this.lastHoveredSlot != null && this.stashSlots.Exists(s => s.El == this.lastHoveredSlot.El))
+            {
+                this.PickSlot(this.lastHoveredSlot);
+            }
+            else
+            {
+                this.pickingSlot = false;
+            }
+
+            SetSettingsVisible(true);
+        }
+
+        private void PickSlot(Slot slot)
+        {
+            this.pickedSlot = slot;
+            this.pickedName = string.IsNullOrEmpty(slot.DisplayName) ? slot.InternalName : slot.DisplayName;
+            this.pickingSlot = false;
+        }
+
+        private void ClearPicked()
+        {
+            this.pickedSlot = null;
+            this.pickedName = string.Empty;
+            this.pickingSlot = false;
+        }
+
+        private static void SetSettingsVisible(bool visible)
+        {
+            SettingsVisibleField?.SetValue(null, visible);
+            ImGui.GetIO().WantCaptureMouse = true;
+        }
+
+        private void RebindPicked()
+        {
+            if (this.pickedSlot == null)
+            {
+                return;
+            }
+
+            var el = this.pickedSlot.El;
+            var center = Center(this.pickedSlot);
+            foreach (var s in this.stashSlots)
+            {
+                if ((el != IntPtr.Zero && s.El == el) || Contains(s, center))
+                {
+                    this.PickSlot(s);
+                    return;
+                }
+            }
         }
 
         private void RefreshHover()

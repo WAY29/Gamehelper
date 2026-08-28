@@ -10,6 +10,7 @@
   "settings.new_recipe": "新配方",
   "settings.recipe_name": "名稱",
   "settings.target": "物品",
+  "settings.pick_hint": "選擇倉庫中的物品為目標",
   "settings.add_target": "新增物品",
   "settings.steps": "步驟",
   "settings.add_step": "新增步驟",
