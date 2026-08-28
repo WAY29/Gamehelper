@@ -55,6 +55,7 @@ namespace ItemCrafter
         private string status = "idle";
         private readonly List<Slot> highlights = new();
         private readonly List<Slot> stashSlots = new();
+        private string stashKind = string.Empty;
         private readonly List<Slot> invSlots = new();
 
         private Item? lastHovered;
@@ -782,7 +783,7 @@ namespace ItemCrafter
                 this.dumpNote = string.Empty;
             }
 
-            ImGui.Text($"Stash slots: {this.stashSlots.Count}  Inv slots: {this.invSlots.Count}");
+            ImGui.Text($"Stash slots: {this.stashSlots.Count} ({this.stashKind})  Inv slots: {this.invSlots.Count}");
             this.DrawPlayerBuffs();
             if (!string.IsNullOrEmpty(this.dumpNote))
             {
@@ -1296,6 +1297,7 @@ namespace ItemCrafter
         private void ScanStash()
         {
             this.stashSlots.Clear();
+            this.stashKind = string.Empty;
             if (!this.EnsureMem())
             {
                 return;
@@ -1368,15 +1370,58 @@ namespace ItemCrafter
                 var kids = this.ReadVec(this.ReadUi(waystoneRoot).ChildrensPtr);
                 if (kids.Length == 16)
                 {
+                    this.stashKind = "waystone";
                     this.ProcessWaystoneTab(kids);
                     return;
                 }
             }
 
             var normal = this.ResolvePath(active, new[] { 0, 0 });
-            if (normal != IntPtr.Zero)
+            if (this.LooksLikeItemGrid(normal))
             {
+                var n = this.ReadVec(this.ReadUi(normal).ChildrensPtr).Length;
+                this.stashKind = n >= 400 ? $"quad {n}" : $"normal {n}";
                 this.ProcessGrid(normal, this.stashSlots);
+                return;
+            }
+
+            var flat = this.ResolvePath(active, new[] { 0 });
+            if (this.LooksLikeItemGrid(flat))
+            {
+                var n = this.ReadVec(this.ReadUi(flat).ChildrensPtr).Length;
+                this.stashKind = $"quad-flat {n}";
+                this.ProcessGrid(flat, this.stashSlots);
+                return;
+            }
+
+            var fragmentRoot = this.ResolvePath(active, new[] { 0, 0, 0, 1 });
+            if (fragmentRoot != IntPtr.Zero)
+            {
+                var pages = this.ReadVec(this.ReadUi(fragmentRoot).ChildrensPtr);
+                if (pages.Length == 6)
+                {
+                    this.ProcessFragmentTabletsTab(pages);
+                }
+            }
+        }
+
+        private bool LooksLikeItemGrid(IntPtr root) =>
+            root != IntPtr.Zero && this.ReadVec(this.ReadUi(root).ChildrensPtr).Length >= 60;
+
+        private void ProcessFragmentTabletsTab(IntPtr[] pages)
+        {
+            for (var i = 0; i < pages.Length; i++)
+            {
+                var page = pages[i];
+                if (page == IntPtr.Zero || !this.IsVisible(page))
+                {
+                    continue;
+                }
+
+                this.stashKind = $"fragment-tablet p{i + 1}/{pages.Length}";
+                var grid = this.ResolvePath(page, new[] { 0, 0 });
+                this.ProcessGrid(grid, this.stashSlots);
+                return;
             }
         }
 
