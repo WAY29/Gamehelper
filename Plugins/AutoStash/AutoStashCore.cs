@@ -35,6 +35,13 @@ namespace AutoStash
         private const float StashInsetX = -10f;
         private const float StashBelowFrame = 10f;
         private const int HudHideDelayMs = 400;
+        private const int StashTabContainerOff = 0x458;
+        private const int StashesBeginOff = 0x358;
+        private const int StashesEndOff = 0x360;
+        private const int VisibleStashIndexOff = 0x370;
+        private const int StashEntryStride = 0x90;
+        private const int PlayerServerDataPtrOff = 0x48;
+        private const int ServerStashTabSize = 104;
         private static readonly int[][] StashFramePaths =
         {
             new[] { 2, 0, 0, 0 },
@@ -52,11 +59,21 @@ namespace AutoStash
         private readonly List<string> log = new();
         private readonly List<Act> pending = new();
         private readonly List<Grid> stashGrids = new();
+        private readonly List<string> stashTabNames = new();
+        private readonly List<int> stashTabIds = new();
+        private int stashTabSkipped;
+        private string stashTabFlagInfo = string.Empty;
+        private IntPtr serverTabsObj;
+        private int serverTabsVecOff = -1;
+        private int serverTabAddOff = -1;
 
         private object? handle;
         private MethodInfo? readPtr;
         private MethodInfo? readUi;
         private MethodInfo? readVec;
+        private MethodInfo? readWs;
+        private MethodInfo? readStdWString;
+        private MethodInfo? readU32;
 
         private Grid? inventoryGrid;
         private Vector2 stashPanelPos;
@@ -85,6 +102,8 @@ namespace AutoStash
         private IntPtr texRight;
         private Vector2 texLeftSize;
         private Vector2 texRightSize;
+        private int stashTabIndex = -1;
+        private IntPtr stashTabContainer;
 
         private string SettingsPath => Path.Join(this.DllDirectory, "config", "settings.txt");
 
@@ -716,6 +735,19 @@ namespace AutoStash
             ImGui.Text($"Stash panel {(int)this.stashPanelPos.X},{(int)this.stashPanelPos.Y} {(int)this.stashPanelSize.X}x{(int)this.stashPanelSize.Y}");
             ImGui.Text($"Inv items {this.inventoryGrid?.Items.Count ?? 0}  store {this.storeCandidates}");
             ImGui.Text($"Stash grids {this.stashGrids.Count} items {this.stashGrids.Sum(g => g.Items.Count)} take {this.takeCandidates} hl {this.takeHighlightCandidates}");
+            if (this.stashTabNames.Count == 0)
+            {
+                ImGui.Text("Stash tabs: (none)");
+            }
+            else
+            {
+                ImGui.Text($"Stash tabs vis={this.stashTabIndex} usable={this.stashTabNames.Count} skipped={this.stashTabSkipped} {this.stashTabFlagInfo}  stc=0x{this.stashTabContainer.ToInt64():X}");
+                for (var i = 0; i < this.stashTabNames.Count; i++)
+                {
+                    var id = this.stashTabIds[i];
+                    ImGui.Text($"{(id == this.stashTabIndex ? ">" : " ")} [{id}] {this.stashTabNames[i]}");
+                }
+            }
             if (this.queuedAction != null)
             {
                 ImGui.Text("Queued: " + this.ActionLabel(this.queuedAction.Value));
@@ -749,6 +781,12 @@ namespace AutoStash
         {
             this.inventoryGrid = null;
             this.stashGrids.Clear();
+            this.stashTabNames.Clear();
+            this.stashTabIds.Clear();
+            this.stashTabSkipped = 0;
+            this.stashTabFlagInfo = string.Empty;
+            this.stashTabIndex = -1;
+            this.stashTabContainer = IntPtr.Zero;
             this.stashOpen = false;
             this.storeCandidates = 0;
             this.takeCandidates = 0;
@@ -780,6 +818,7 @@ namespace AutoStash
 
             if (ui.LeftPanel.IsVisible)
             {
+                this.CollectStashTabs(ui.LeftPanel.Address);
                 var tab = this.ResolveActiveTab(ui.LeftPanel.Address);
                 this.stashOpen = tab != IntPtr.Zero;
                 if (this.stashOpen)
@@ -846,6 +885,373 @@ namespace AutoStash
 
             var display = ImGui.GetIO().DisplaySize;
             return display.Y <= 0f || pos.Y + size.Y < display.Y - 90f;
+        }
+
+        private void CollectStashTabs(IntPtr leftPanel)
+        {
+            var seen = new HashSet<long>();
+            foreach (var cand in this.StashTabCandidates(leftPanel))
+            {
+                if (cand == IntPtr.Zero || !seen.Add(cand.ToInt64()))
+                {
+                    continue;
+                }
+
+                if (this.TryReadStashTabContainer(cand) ||
+                    this.TryReadStashTabContainer(this.ReadPtr(cand + StashTabContainerOff)))
+                {
+                    return;
+                }
+            }
+        }
+
+        private IEnumerable<IntPtr> StashTabCandidates(IntPtr leftPanel)
+        {
+            yield return leftPanel;
+            foreach (var path in StashFramePaths)
+            {
+                yield return this.ResolvePath(leftPanel, path);
+            }
+
+            foreach (var path in StashTabsPaths)
+            {
+                yield return this.ResolvePath(leftPanel, path);
+            }
+
+            var cur = this.ResolveActiveTab(leftPanel);
+            for (var i = 0; i < 16 && cur != IntPtr.Zero; i++)
+            {
+                yield return cur;
+                cur = this.ReadUi(cur).ParentPtr;
+            }
+        }
+
+        private bool TryReadStashTabContainer(IntPtr stc)
+        {
+            if (stc == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            var first = this.ReadPtr(stc + StashesBeginOff);
+            var last = this.ReadPtr(stc + StashesEndOff);
+            var span = last.ToInt64() - first.ToInt64();
+            if (first == IntPtr.Zero || span <= 0 || span % StashEntryStride != 0)
+            {
+                return false;
+            }
+
+            var n = (int)(span / StashEntryStride);
+            if (n < 1 || n > 400)
+            {
+                return false;
+            }
+
+            var vis = (int)this.ReadPtr(stc + VisibleStashIndexOff).ToInt64();
+            if (vis < 0 || vis >= n)
+            {
+                return false;
+            }
+
+            var uiNames = new List<string>(n);
+            var named = 0;
+            for (var i = 0; i < n; i++)
+            {
+                var name = this.ReadWString(first + (i * StashEntryStride));
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    named++;
+                }
+                else
+                {
+                    name = $"#{i}";
+                }
+
+                uiNames.Add(name);
+            }
+
+            if (named == 0)
+            {
+                return false;
+            }
+
+            this.TryLocateServerTabs(uiNames);
+            var names = new List<string>();
+            var ids = new List<int>();
+            var skipped = 0;
+            for (var i = 0; i < n; i++)
+            {
+                if (this.IsBlockedTab(i, uiNames[i]))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                ids.Add(i);
+                names.Add(uiNames[i]);
+            }
+
+            this.stashTabContainer = stc;
+            this.stashTabIndex = vis;
+            this.stashTabSkipped = skipped;
+            this.stashTabNames.Clear();
+            this.stashTabNames.AddRange(names);
+            this.stashTabIds.Clear();
+            this.stashTabIds.AddRange(ids);
+            return true;
+        }
+
+        private bool IsBlockedTab(int index, string name)
+        {
+            if (this.serverTabsVecOff >= 0 && this.serverTabAddOff >= 0 && this.TryServerTabEntry(index, name, out var entry))
+            {
+                return (this.ReadU32(entry + this.serverTabAddOff) & 2) == 0;
+            }
+
+            return IsBlockedTabName(name);
+        }
+
+        private static bool IsBlockedTabName(string name) =>
+            name.Contains("只可取出", StringComparison.Ordinal) ||
+            name.Contains("无法使用", StringComparison.Ordinal) ||
+            name.Contains("無法使用", StringComparison.Ordinal) ||
+            name.Contains("Remove-only", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Remove Only", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Unusable", StringComparison.OrdinalIgnoreCase);
+
+        private static string TabBaseName(string name)
+        {
+            if (name.EndsWith(')') )
+            {
+                var i = name.LastIndexOf(" (", StringComparison.Ordinal);
+                if (i > 0)
+                {
+                    return name[..i];
+                }
+            }
+
+            return name;
+        }
+
+        private void TryLocateServerTabs(List<string> uiNames)
+        {
+            if (this.serverTabsVecOff >= 0 && this.TryMatchServerVec(this.serverTabsObj, this.serverTabsVecOff, uiNames, out _))
+            {
+                this.stashTabFlagInfo = $"flags add@+0x{this.serverTabAddOff:X}";
+                return;
+            }
+
+            this.serverTabsVecOff = -1;
+            this.serverTabAddOff = -1;
+            this.serverTabsObj = IntPtr.Zero;
+            this.stashTabFlagInfo = "flags (name)";
+            var sd = Core.States.InGameStateObject.CurrentAreaInstance.ServerDataObject.Address;
+            if (sd == IntPtr.Zero)
+            {
+                return;
+            }
+
+            var vecFirst = this.ReadPtr(sd + PlayerServerDataPtrOff);
+            if (vecFirst == IntPtr.Zero)
+            {
+                return;
+            }
+
+            var player0 = this.ReadPtr(vecFirst);
+            if (player0 == IntPtr.Zero)
+            {
+                return;
+            }
+
+            var seen = new HashSet<long>();
+            if (this.TryScanServerTabsObj(player0, uiNames, seen))
+            {
+                return;
+            }
+
+            for (var off = 0x2E0; off <= 0x360; off += 8)
+            {
+                if (this.TryScanServerTabsObj(this.ReadPtr(player0 + off), uiNames, seen))
+                {
+                    return;
+                }
+            }
+        }
+
+        private bool TryScanServerTabsObj(IntPtr obj, List<string> uiNames, HashSet<long> seen)
+        {
+            if (obj == IntPtr.Zero || !seen.Add(obj.ToInt64()))
+            {
+                return false;
+            }
+
+            for (var off = 0x80; off <= 0x580; off += 8)
+            {
+                if (!this.TryMatchServerVec(obj, off, uiNames, out var begin))
+                {
+                    continue;
+                }
+
+                var last = this.ReadPtr(obj + off + 8);
+                var count = (int)((last.ToInt64() - begin.ToInt64()) / ServerStashTabSize);
+                var addOff = this.FindAddFlagOffset(begin, count, uiNames);
+                if (addOff < 0)
+                {
+                    continue;
+                }
+
+                this.serverTabsObj = obj;
+                this.serverTabsVecOff = off;
+                this.serverTabAddOff = addOff;
+                this.stashTabFlagInfo = $"flags add@+0x{addOff:X} vec@+0x{off:X}";
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryMatchServerVec(IntPtr obj, int off, List<string> uiNames, out IntPtr begin)
+        {
+            begin = IntPtr.Zero;
+            if (obj == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            try
+            {
+                begin = this.ReadPtr(obj + off);
+                var last = this.ReadPtr(obj + off + 8);
+                var span = last.ToInt64() - begin.ToInt64();
+                if (begin == IntPtr.Zero || span <= 0 || span % ServerStashTabSize != 0)
+                {
+                    return false;
+                }
+
+                var count = (int)(span / ServerStashTabSize);
+                if (count < 4 || count > 400 || Math.Abs(count - uiNames.Count) > 40)
+                {
+                    return false;
+                }
+
+                var serverNames = new HashSet<string>(StringComparer.Ordinal);
+                var n = Math.Min(count, 64);
+                for (var i = 0; i < n; i++)
+                {
+                    var s = TabBaseName(this.ReadWString(begin + (i * ServerStashTabSize)));
+                    if (!string.IsNullOrWhiteSpace(s))
+                    {
+                        serverNames.Add(s);
+                    }
+                }
+
+                var hits = 0;
+                var check = Math.Min(uiNames.Count, 16);
+                for (var i = 0; i < check; i++)
+                {
+                    if (serverNames.Contains(TabBaseName(uiNames[i])))
+                    {
+                        hits++;
+                    }
+                }
+
+                return hits >= Math.Min(check, 4);
+            }
+            catch
+            {
+                begin = IntPtr.Zero;
+                return false;
+            }
+        }
+
+        private int FindAddFlagOffset(IntPtr begin, int count, List<string> uiNames)
+        {
+            var pairs = new List<(IntPtr Entry, bool Blocked)>();
+            var map = new Dictionary<string, IntPtr>(StringComparer.Ordinal);
+            for (var i = 0; i < count; i++)
+            {
+                var entry = begin + (i * ServerStashTabSize);
+                var s = TabBaseName(this.ReadWString(entry));
+                if (!string.IsNullOrWhiteSpace(s) && !map.ContainsKey(s))
+                {
+                    map[s] = entry;
+                }
+            }
+
+            foreach (var name in uiNames)
+            {
+                if (map.TryGetValue(TabBaseName(name), out var entry))
+                {
+                    pairs.Add((entry, IsBlockedTabName(name)));
+                }
+            }
+
+            if (pairs.Count < 8 || !pairs.Any(p => p.Blocked) || !pairs.Any(p => !p.Blocked))
+            {
+                return -1;
+            }
+
+            for (var off = 0x20; off < ServerStashTabSize; off++)
+            {
+                var ok = true;
+                foreach (var (entry, blocked) in pairs)
+                {
+                    var noAdd = (this.ReadU32(entry + off) & 2) == 0;
+                    if (noAdd != blocked)
+                    {
+                        ok = false;
+                        break;
+                    }
+                }
+
+                if (ok)
+                {
+                    return off;
+                }
+            }
+
+            return -1;
+        }
+
+        private bool TryServerTabEntry(int index, string uiName, out IntPtr entry)
+        {
+            entry = IntPtr.Zero;
+            if (this.serverTabsObj == IntPtr.Zero || this.serverTabsVecOff < 0)
+            {
+                return false;
+            }
+
+            var begin = this.ReadPtr(this.serverTabsObj + this.serverTabsVecOff);
+            var last = this.ReadPtr(this.serverTabsObj + this.serverTabsVecOff + 8);
+            var span = last.ToInt64() - begin.ToInt64();
+            if (begin == IntPtr.Zero || span <= 0 || span % ServerStashTabSize != 0)
+            {
+                return false;
+            }
+
+            var count = (int)(span / ServerStashTabSize);
+            var baseName = TabBaseName(uiName);
+            if ((uint)index < (uint)count)
+            {
+                var atIndex = begin + (index * ServerStashTabSize);
+                if (TabBaseName(this.ReadWString(atIndex)) == baseName)
+                {
+                    entry = atIndex;
+                    return true;
+                }
+            }
+
+            for (var i = 0; i < count; i++)
+            {
+                var cur = begin + (i * ServerStashTabSize);
+                if (TabBaseName(this.ReadWString(cur)) == baseName)
+                {
+                    entry = cur;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private IntPtr ResolveActiveTab(IntPtr leftPanel)
@@ -1505,6 +1911,11 @@ namespace AutoStash
                 {
                     this.readVec = m.MakeGenericMethod(typeof(IntPtr));
                 }
+
+                if (m.Name == "ReadStdWString" && m.GetParameters().Length == 1)
+                {
+                    this.readStdWString = m;
+                }
             }
 
             if (genericRead == null || this.readVec == null)
@@ -1514,7 +1925,48 @@ namespace AutoStash
 
             this.readPtr = genericRead.MakeGenericMethod(typeof(IntPtr));
             this.readUi = genericRead.MakeGenericMethod(typeof(UiElementBaseOffset));
+            this.readWs = genericRead.MakeGenericMethod(typeof(StdWString));
+            this.readU32 = genericRead.MakeGenericMethod(typeof(uint));
             return true;
+        }
+
+        private uint ReadU32(IntPtr addr)
+        {
+            if (this.readU32 == null || addr == IntPtr.Zero)
+            {
+                return 0;
+            }
+
+            try
+            {
+                return this.readU32.Invoke(this.handle, new object[] { addr }) is uint v ? v : 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private string ReadWString(IntPtr addr)
+        {
+            if (this.readWs == null || this.readStdWString == null || addr == IntPtr.Zero)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                if (this.readWs.Invoke(this.handle, new object[] { addr }) is not StdWString ws)
+                {
+                    return string.Empty;
+                }
+
+                return this.readStdWString.Invoke(this.handle, new object[] { ws }) as string ?? string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
 
         private IntPtr ReadPtr(IntPtr addr) =>
