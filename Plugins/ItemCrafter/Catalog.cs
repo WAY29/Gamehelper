@@ -21,6 +21,7 @@ namespace ItemCrafter
         Chance,
         Artificer,
         Quality,
+        Identify,
     }
 
     internal readonly record struct CurrencyInfo(string InternalName, string English, StepKind Kind);
@@ -175,6 +176,7 @@ namespace ItemCrafter
             new("CurrencyArmourQuality", "Armourer's Scrap", StepKind.Quality),
             new("CurrencyWeaponQuality", "Blacksmith's Whetstone", StepKind.Quality),
             new("CurrencyFlaskQuality", "Glassblower's Bauble", StepKind.Quality),
+            new("CurrencyIdentification", "Scroll of Wisdom", StepKind.Identify),
             new("OmenOnChaosMapItemRarity", "Omen of Chaotic Rarity", StepKind.Omen),
             new("OmenOnChaosMapPackSize", "Omen of Chaotic Quantity", StepKind.Omen),
             new("OmenOnChaosMapMonsterEffectiveness", "Omen of Chaotic Effectiveness", StepKind.Omen),
@@ -285,8 +287,13 @@ namespace ItemCrafter
             return 0;
         }
 
-        public static bool IsEligible(StepKind kind, Rarity rarity, int explicitCount, bool corrupted, int untilAffixes, int quality = 0)
+        public static bool IsEligible(StepKind kind, Rarity rarity, int explicitCount, bool corrupted, int untilAffixes, int quality = 0, bool identified = true)
         {
+            if (kind == StepKind.Identify)
+            {
+                return !identified;
+            }
+
             if (corrupted)
             {
                 return false;
@@ -388,7 +395,8 @@ namespace ItemCrafter
         {
             if (expr.Items.Count == 0)
             {
-                return HasMod(names, expr.Mod);
+                var hit = HasMod(names, expr.Mod);
+                return expr.Not ? !hit : hit;
             }
 
             if (expr.All)
@@ -507,6 +515,7 @@ namespace ItemCrafter
                 !TryGet("CurrencyUpgradeToMagic3", out _) ||
                 !TryGet("CurrencyRemoveMod", out _) ||
                 !TryGet("CurrencyFlaskQuality", out _) ||
+                !TryGet("CurrencyIdentification", out _) ||
                 TryGet("CurrencyUpgradeToRare2", out _))
             {
                 throw new InvalidOperationException("catalog");
@@ -543,7 +552,10 @@ namespace ItemCrafter
                 IsEligible(StepKind.Chance, Rarity.Magic, 1, false, 6) ||
                 !IsEligible(StepKind.Quality, Rarity.Rare, 4, false, 6, 10) ||
                 IsEligible(StepKind.Quality, Rarity.Rare, 4, false, 6, 20) ||
-                Clicks(StepKind.Quality, 0, 6, 15) != 5)
+                Clicks(StepKind.Quality, 0, 6, 15) != 5 ||
+                IsEligible(StepKind.Identify, Rarity.Rare, 4, false, 6, 0, true) ||
+                !IsEligible(StepKind.Identify, Rarity.Rare, 4, false, 6, 0, false) ||
+                !IsEligible(StepKind.Identify, Rarity.Normal, 0, true, 6, 0, false))
             {
                 throw new InvalidOperationException("craft rules");
             }
@@ -565,6 +577,8 @@ namespace ItemCrafter
                 MatchesConds(["TowerAdditionalEssenceChance"], new CraftExpr { Mod = "TowerAdditionalEssence" }, false) ||
                 !MatchesConds(["TowerDroppedItemRarityIncrease3"], new CraftExpr { Mod = "稀有度" }, false) ||
                 MatchesConds(["TowerDroppedItemRarityIncrease3"], new CraftExpr { Mod = "TowerDropped" }, false) ||
+                MatchesConds(["Foo"], new CraftExpr { Mod = "Foo", Not = true }, false) ||
+                !MatchesConds(["Bar"], new CraftExpr { Mod = "Foo", Not = true }, false) ||
                 !MatchesTarget("BreachAugment", "Metadata/Items/TowerAugment/BreachAugment", "BreachAugment", "Breach Tablet") ||
                 MatchesTarget("MapKeyTier15", "Metadata/Items/TowerAugment/BreachAugment", "BreachAugment", "Breach Tablet"))
             {

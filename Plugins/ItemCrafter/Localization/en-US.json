@@ -1,5 +1,5 @@
 {
-  "plugin.description": "Runs a user-defined waystone crafting recipe: currencies from inventory, waystones on the visible stash page.",
+  "plugin.description": "Craft items from a user recipe",
   "settings.toggle": "Toggle key",
   "settings.delay": "Click delay (ms)",
   "settings.abort_px": "Mouse abort (px)",
@@ -19,6 +19,8 @@
   "settings.and": "AND",
   "settings.or": "OR",
   "settings.add_cond": "Add condition",
+  "settings.cond_has": "Has affix",
+  "settings.cond_not": "Lacks affix",
   "settings.add_group": "( )",
   "settings.mod_hint": "contains affix",
   "settings.affix_lang": "Name language",
@@ -53,6 +55,7 @@
   "item.CurrencyArmourQuality": "Armourer's Scrap",
   "item.CurrencyWeaponQuality": "Blacksmith's Whetstone",
   "item.CurrencyFlaskQuality": "Glassblower's Bauble",
+  "item.CurrencyIdentification": "Scroll of Wisdom",
   "item.OmenOnChaosMapItemRarity": "Omen of Chaotic Rarity",
   "item.OmenOnChaosMapPackSize": "Omen of Chaotic Quantity",
   "item.OmenOnChaosMapMonsterEffectiveness": "Omen of Chaotic Effectiveness",

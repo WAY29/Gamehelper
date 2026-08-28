@@ -1,5 +1,5 @@
 {
-  "plugin.description": "依使用者配方做換界石：通貨從背包點，換界石打目前看得見的倉庫頁。",
+  "plugin.description": "按使用者配方去製作物品",
   "settings.toggle": "開關熱鍵",
   "settings.delay": "點擊間隔（毫秒）",
   "settings.abort_px": "滑鼠偏移停止（像素）",
@@ -19,6 +19,8 @@
   "settings.and": "AND",
   "settings.or": "OR",
   "settings.add_cond": "新增條件",
+  "settings.cond_has": "含詞綴",
+  "settings.cond_not": "不含詞綴",
   "settings.add_group": "括號",
   "settings.mod_hint": "含詞綴",
   "settings.affix_lang": "名稱語言",
@@ -53,6 +55,7 @@
   "item.CurrencyArmourQuality": "護甲片",
   "item.CurrencyWeaponQuality": "磨刀石",
   "item.CurrencyFlaskQuality": "玻璃彈珠",
+  "item.CurrencyIdentification": "知識卷軸",
   "item.OmenOnChaosMapItemRarity": "混沌稀有度之兆",
   "item.OmenOnChaosMapPackSize": "混沌數量之兆",
   "item.OmenOnChaosMapMonsterEffectiveness": "混沌效用之兆",

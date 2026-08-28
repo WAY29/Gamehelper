@@ -13,6 +13,7 @@ namespace ItemCrafter
     public sealed class CraftExpr
     {
         public string Mod = string.Empty;
+        public bool Not;
         public bool All = true;
         public List<CraftExpr> Items = new();
     }

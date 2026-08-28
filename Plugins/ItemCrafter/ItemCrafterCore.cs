@@ -23,6 +23,7 @@ namespace ItemCrafter
     {
         private const int ItemPtrHint = 0x4F8;
         private const int BaseFlagsOffset = 0xC7;
+        private const int IdentifiedOffset = 0x90;
         private const byte CorruptedBit = 0x01;
         private const int ToggleableOnOffset = 0x18;
         private static readonly FieldInfo? ComponentAddressesField =
@@ -96,6 +97,7 @@ namespace ItemCrafter
             public int Stack = 1;
             public int Quality;
             public bool Corrupted;
+            public bool Identified = true;
             public bool OmenOn;
             public IntPtr El;
             public List<string> ModNames = new();
@@ -486,6 +488,8 @@ namespace ItemCrafter
                 }
                 else
                 {
+                    this.DrawCondOp(ref item.Not);
+                    ImGui.SameLine();
                     this.DrawModCombo(ref item.Mod);
                     ImGui.SameLine();
                     if (this.IconButton("##delCond", DrawXIcon))
@@ -526,9 +530,19 @@ namespace ItemCrafter
             ImGui.PopID();
         }
 
+        private void DrawCondOp(ref bool not)
+        {
+            ImGui.SetNextItemWidth(88);
+            var op = not ? 1 : 0;
+            if (ImGui.Combo("##condOp", ref op, [this.PluginText.T("settings.cond_has", "Has affix"), this.PluginText.T("settings.cond_not", "Lacks affix")], 2))
+            {
+                not = op == 1;
+            }
+        }
+
         private void DrawModCombo(ref string id)
         {
-            ImGui.SetNextItemWidth(280);
+            ImGui.SetNextItemWidth(240);
             if (!ImGui.BeginCombo("##mod", this.ModPreview(id)))
             {
                 return;
@@ -825,6 +839,16 @@ namespace ItemCrafter
                     ImGui.SameLine();
                     ImGui.Text($"(Base+0xC7={this.ReadByte(baseComp.Address + BaseFlagsOffset):X2})");
                 }
+            }
+
+            if (mods != null && mods.Address != IntPtr.Zero && this.EnsureMem())
+            {
+                var identified = this.ReadByte(mods.Address + IdentifiedOffset) != 0;
+                ImGui.TextColored(
+                    identified ? new Vector4(0.35f, 0.9f, 0.35f, 1f) : new Vector4(1f, 0.75f, 0.2f, 1f),
+                    identified ? "已鉴定" : "未鉴定");
+                ImGui.SameLine();
+                ImGui.Text($"(Mods+0x90={this.ReadByte(mods.Address + IdentifiedOffset):X2})");
             }
 
             if (this.TryGetCompAddr(item, "Toggleable", out var toggleAddr))
@@ -1159,7 +1183,7 @@ namespace ItemCrafter
                     if (!Catalog.MatchesAny(recipe.TargetIds, stone.Path, stone.InternalName, stone.DisplayName) ||
                         !Catalog.CanApply(info, stone.Path) ||
                         !this.Passes(op, stone) ||
-                        !Catalog.IsEligible(info.Kind, stone.Rarity, stone.ExplicitCount, stone.Corrupted, step.UntilAffixes, stone.Quality))
+                        !Catalog.IsEligible(info.Kind, stone.Rarity, stone.ExplicitCount, stone.Corrupted, step.UntilAffixes, stone.Quality, stone.Identified))
                     {
                         continue;
                     }
@@ -1543,6 +1567,12 @@ namespace ItemCrafter
                 quality = (int)this.ReadU32(qualityAddr + 0x18);
             }
 
+            var identified = true;
+            if (mods != null && mods.Address != IntPtr.Zero && this.EnsureMem())
+            {
+                identified = this.ReadByte(mods.Address + IdentifiedOffset) != 0;
+            }
+
             return new Slot
             {
                 Item = item,
@@ -1557,6 +1587,7 @@ namespace ItemCrafter
                 Stack = stack,
                 Quality = quality,
                 Corrupted = this.IsCorrupted(b),
+                Identified = identified,
                 OmenOn = this.IsOmenOn(item),
                 El = el,
             };
