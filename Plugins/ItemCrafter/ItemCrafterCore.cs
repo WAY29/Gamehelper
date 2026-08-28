@@ -22,6 +22,12 @@ namespace ItemCrafter
     public sealed class ItemCrafterCore : PCore<ItemCrafterSettings>
     {
         private const int ItemPtrHint = 0x4F8;
+        private const int StashTabContainerOff = 0x458;
+        private const int StashesBeginOff = 0x358;
+        private const int StashesEndOff = 0x360;
+        private const int VisibleStashIndexOff = 0x370;
+        private const int StashEntryStride = 0x90;
+        private const int StashEntryInvOff = 0x80;
         private const int BaseFlagsOffset = 0xC7;
         private const int IdentifiedOffset = 0x90;
         private const byte CorruptedBit = 0x01;
@@ -40,6 +46,7 @@ namespace ItemCrafter
         private MethodInfo? readByte;
         private MethodInfo? readUi;
         private MethodInfo? readVec;
+        private MethodInfo? readI32;
 
         private bool running;
         private int stepIndex = -1;
@@ -761,6 +768,7 @@ namespace ItemCrafter
 
                 if (this.Settings.ShowDebugWindow)
                 {
+                    this.DrawHoverRect();
                     this.DrawDebugWindow();
                 }
 
@@ -1312,10 +1320,72 @@ namespace ItemCrafter
             }
         }
 
+        private void DrawHoverRect()
+        {
+            var dl = ImGui.GetForegroundDrawList();
+            foreach (var slot in this.stashSlots)
+            {
+                dl.AddRect(slot.Pos, slot.Pos + slot.Size, 0xFFFFFF00, 0f, ImDrawFlags.None, 2f);
+            }
+
+            if (this.lastHoveredSlot is { } s)
+            {
+                dl.AddRect(s.Pos, s.Pos + s.Size, 0xFF00FF00, 0f, ImDrawFlags.None, 3f);
+            }
+        }
+
         private void ScanPanels()
         {
             this.ScanStash();
             this.ScanInv();
+            this.RefreshHover();
+        }
+
+        private void RefreshHover()
+        {
+            if (this.freezeHover)
+            {
+                return;
+            }
+
+            var mouse = ImGui.GetMousePos();
+            Slot? best = null;
+            var bestArea = float.MaxValue;
+            foreach (var s in this.stashSlots)
+            {
+                if (!Contains(s, mouse))
+                {
+                    continue;
+                }
+
+                var area = s.Size.X * s.Size.Y;
+                if (area < bestArea)
+                {
+                    bestArea = area;
+                    best = s;
+                }
+            }
+
+            foreach (var s in this.invSlots)
+            {
+                if (!Contains(s, mouse))
+                {
+                    continue;
+                }
+
+                var area = s.Size.X * s.Size.Y;
+                if (area < bestArea)
+                {
+                    bestArea = area;
+                    best = s;
+                }
+            }
+
+            if (best != null)
+            {
+                this.lastHovered = best.Item;
+                this.lastHoveredSlot = best;
+            }
         }
 
         private void ScanStash()
@@ -1373,16 +1443,7 @@ namespace ItemCrafter
         private void ProcessStashTabs(IntPtr stashTabsContainer)
         {
             var tabs = this.ReadVec(this.ReadUi(stashTabsContainer).ChildrensPtr);
-            IntPtr active = IntPtr.Zero;
-            foreach (var tab in tabs)
-            {
-                if (tab != IntPtr.Zero && this.IsVisible(tab))
-                {
-                    active = tab;
-                    break;
-                }
-            }
-
+            var active = this.PickActiveTab(tabs);
             if (active == IntPtr.Zero)
             {
                 return;
@@ -1401,21 +1462,26 @@ namespace ItemCrafter
             }
 
             var normal = this.ResolvePath(active, new[] { 0, 0 });
-            if (this.LooksLikeItemGrid(normal))
+            if (this.HasSize(normal))
             {
-                var n = this.ReadVec(this.ReadUi(normal).ChildrensPtr).Length;
-                this.stashKind = n >= 400 ? $"quad {n}" : $"normal {n}";
                 this.ProcessGrid(normal, this.stashSlots);
-                return;
+                if (this.stashSlots.Count > 0)
+                {
+                    var n = this.ReadVec(this.ReadUi(normal).ChildrensPtr).Length;
+                    this.stashKind = n >= 400 ? $"quad {n}" : n >= 60 ? $"normal {n}" : $"grid {n}";
+                    return;
+                }
             }
 
             var flat = this.ResolvePath(active, new[] { 0 });
-            if (this.LooksLikeItemGrid(flat))
+            if (this.HasSize(flat))
             {
-                var n = this.ReadVec(this.ReadUi(flat).ChildrensPtr).Length;
-                this.stashKind = $"quad-flat {n}";
                 this.ProcessGrid(flat, this.stashSlots);
-                return;
+                if (this.stashSlots.Count > 0)
+                {
+                    this.stashKind = $"flat {this.stashSlots.Count}";
+                    return;
+                }
             }
 
             var fragmentRoot = this.ResolvePath(active, new[] { 0, 0, 0, 1 });
@@ -1425,12 +1491,151 @@ namespace ItemCrafter
                 if (pages.Length == 6)
                 {
                     this.ProcessFragmentTabletsTab(pages);
+                    if (this.stashSlots.Count > 0)
+                    {
+                        return;
+                    }
                 }
+            }
+
+            this.CollectWellGroups(active, this.stashSlots);
+            if (this.stashSlots.Count > 0)
+            {
+                this.stashKind = $"wells {this.stashSlots.Count}";
             }
         }
 
-        private bool LooksLikeItemGrid(IntPtr root) =>
-            root != IntPtr.Zero && this.ReadVec(this.ReadUi(root).ChildrensPtr).Length >= 60;
+        private IntPtr PickActiveTab(IntPtr[] tabs)
+        {
+            foreach (var tab in tabs)
+            {
+                if (this.HasTabContent(tab))
+                {
+                    return tab;
+                }
+            }
+
+            foreach (var tab in tabs)
+            {
+                if (tab != IntPtr.Zero && this.IsVisible(tab))
+                {
+                    return tab;
+                }
+            }
+
+            return IntPtr.Zero;
+        }
+
+        private bool HasTabContent(IntPtr tab)
+        {
+            if (tab == IntPtr.Zero || !this.IsVisible(tab))
+            {
+                return false;
+            }
+
+            var waystone = this.ResolvePath(tab, new[] { 0, 1 });
+            if (waystone != IntPtr.Zero && this.ReadVec(this.ReadUi(waystone).ChildrensPtr).Length == 16)
+            {
+                return true;
+            }
+
+            var fragment = this.ResolvePath(tab, new[] { 0, 0, 0, 1 });
+            if (fragment != IntPtr.Zero && this.ReadVec(this.ReadUi(fragment).ChildrensPtr).Length == 6)
+            {
+                return true;
+            }
+
+            return this.HasSize(this.ResolvePath(tab, new[] { 0, 0 })) || this.HasSize(this.ResolvePath(tab, new[] { 0 }));
+        }
+
+        private bool HasSize(IntPtr el) =>
+            el != IntPtr.Zero && this.IsVisible(el) && this.ReadUi(el).UnscaledSize.X > 0f;
+
+        private IntPtr FindVisibleStashInventory()
+        {
+            var ui = Core.States.InGameStateObject.GameUi;
+            if (ui == null)
+            {
+                return IntPtr.Zero;
+            }
+
+            var left = ui.LeftPanel.Address;
+            var inv = this.TryVisibleInventory(left);
+            if (inv == IntPtr.Zero)
+            {
+                inv = this.TryVisibleInventory(this.ReadPtr(left + StashTabContainerOff));
+            }
+
+            if (inv != IntPtr.Zero)
+            {
+                return inv;
+            }
+
+            foreach (var path in StashTabsPaths)
+            {
+                var tabs = this.ResolvePath(left, path);
+                if (tabs == IntPtr.Zero)
+                {
+                    continue;
+                }
+
+                inv = this.TryVisibleInventory(tabs);
+                if (inv != IntPtr.Zero)
+                {
+                    return inv;
+                }
+
+                var cur = this.PickActiveTab(this.ReadVec(this.ReadUi(tabs).ChildrensPtr));
+                for (var i = 0; i < 16 && cur != IntPtr.Zero; i++)
+                {
+                    inv = this.TryVisibleInventory(cur);
+                    if (inv == IntPtr.Zero)
+                    {
+                        inv = this.TryVisibleInventory(this.ReadPtr(cur + StashTabContainerOff));
+                    }
+
+                    if (inv != IntPtr.Zero)
+                    {
+                        return inv;
+                    }
+
+                    cur = this.ReadUi(cur).ParentPtr;
+                }
+            }
+
+            return IntPtr.Zero;
+        }
+
+        private IntPtr TryVisibleInventory(IntPtr stc)
+        {
+            if (stc == IntPtr.Zero)
+            {
+                return IntPtr.Zero;
+            }
+
+            var first = this.ReadPtr(stc + StashesBeginOff);
+            var last = this.ReadPtr(stc + StashesEndOff);
+            var span = last.ToInt64() - first.ToInt64();
+            if (first == IntPtr.Zero || span <= 0 || span % StashEntryStride != 0)
+            {
+                return IntPtr.Zero;
+            }
+
+            var n = (int)(span / StashEntryStride);
+            if (n < 1 || n > 400)
+            {
+                return IntPtr.Zero;
+            }
+
+            var vis = this.ReadI32(stc + VisibleStashIndexOff);
+            if ((uint)vis >= (uint)n)
+            {
+                return IntPtr.Zero;
+            }
+
+            var inv = this.ReadPtr(first + (vis * StashEntryStride) + StashEntryInvOff);
+            return inv != IntPtr.Zero && this.IsVisible(inv) ? inv : IntPtr.Zero;
+        }
 
         private void ProcessFragmentTabletsTab(IntPtr[] pages)
         {
@@ -1496,43 +1701,188 @@ namespace ItemCrafter
                 return;
             }
 
-            var slots = this.ReadVec(this.ReadUi(gridRoot).ChildrensPtr);
-            var mouse = ImGui.GetMousePos();
-            foreach (var slot in slots)
+            foreach (var slot in this.ReadVec(this.ReadUi(gridRoot).ChildrensPtr))
             {
-                if (slot == IntPtr.Zero || !this.IsVisible(slot))
-                {
-                    continue;
-                }
+                this.TryAddSlot(slot, dest);
+            }
+        }
 
-                var itemAddr = this.ItemPtr(slot);
-                if (itemAddr == IntPtr.Zero ||
-                    !PluginUiElementReflection.TryValidateItemAddress(itemAddr, out var path, out _))
-                {
-                    continue;
-                }
+        private void CollectWellGroups(IntPtr panel, List<Slot> dest)
+        {
+            if (panel == IntPtr.Zero ||
+                !PluginUiElementReflection.TryGetAbsoluteRect(panel, out var clipPos, out var clipSize) ||
+                clipSize.X < 200f || clipSize.Y < 200f)
+            {
+                return;
+            }
 
-                var item = ReadItem(itemAddr);
-                if (item == null)
-                {
-                    continue;
-                }
+            this.WalkWellGroups(panel, dest, 0, clipPos, clipSize);
+            this.WalkIsolatedWells(panel, dest, 0, clipPos, clipSize);
+        }
 
-                if (!PluginUiElementReflection.TryGetAbsoluteRect(slot, out var pos, out var size))
-                {
-                    continue;
-                }
+        private void WalkWellGroups(IntPtr el, List<Slot> dest, int depth, Vector2 clipPos, Vector2 clipSize)
+        {
+            if (el == IntPtr.Zero || depth > 10 || !this.IsVisible(el))
+            {
+                return;
+            }
 
-                var made = this.ToSlot(item, path, pos, size, slot);
-                dest.Add(made);
-                if (!this.freezeHover &&
-                    mouse.X >= pos.X && mouse.X <= pos.X + size.X &&
-                    mouse.Y >= pos.Y && mouse.Y <= pos.Y + size.Y)
+            var kids = this.ReadVec(this.ReadUi(el).ChildrensPtr);
+            var wells = 0;
+            foreach (var kid in kids)
+            {
+                if (this.IsWellInClip(kid, clipPos, clipSize))
                 {
-                    this.lastHovered = item;
-                    this.lastHoveredSlot = made;
+                    wells++;
                 }
             }
+
+            if (wells >= 2)
+            {
+                foreach (var kid in kids)
+                {
+                    this.TryAddWell(kid, dest, clipPos, clipSize);
+                }
+            }
+
+            foreach (var kid in kids)
+            {
+                this.WalkWellGroups(kid, dest, depth + 1, clipPos, clipSize);
+            }
+        }
+
+        private void WalkIsolatedWells(IntPtr el, List<Slot> dest, int depth, Vector2 clipPos, Vector2 clipSize)
+        {
+            if (el == IntPtr.Zero || depth > 10 || !this.IsVisible(el))
+            {
+                return;
+            }
+
+            this.TryAddWell(el, dest, clipPos, clipSize);
+            foreach (var kid in this.ReadVec(this.ReadUi(el).ChildrensPtr))
+            {
+                this.WalkIsolatedWells(kid, dest, depth + 1, clipPos, clipSize);
+            }
+        }
+
+        private bool IsWellInClip(IntPtr el, Vector2 clipPos, Vector2 clipSize)
+        {
+            return this.IsVisible(el) &&
+                   PluginUiElementReflection.TryGetAbsoluteRect(el, out var pos, out var size) &&
+                   IsWellSize(size) &&
+                   ContainsClip(pos + (size * 0.5f), clipPos, clipSize);
+        }
+
+        private bool TryAddWell(IntPtr el, List<Slot> dest, Vector2 clipPos, Vector2 clipSize)
+        {
+            if (!this.IsWellInClip(el, clipPos, clipSize))
+            {
+                return false;
+            }
+
+            PluginUiElementReflection.TryGetAbsoluteRect(el, out var pos, out var size);
+            var itemAddr = this.FindItemPtr(el, 2);
+            if (itemAddr == IntPtr.Zero ||
+                !PluginUiElementReflection.TryValidateItemAddress(itemAddr, out var path, out _))
+            {
+                return false;
+            }
+
+            var area = size.X * size.Y;
+            for (var i = 0; i < dest.Count; i++)
+            {
+                var existing = dest[i];
+                if (existing.El == el)
+                {
+                    return false;
+                }
+
+                if (existing.Item.Address == itemAddr)
+                {
+                    if (area > existing.Size.X * existing.Size.Y)
+                    {
+                        var bigger = ReadItem(itemAddr);
+                        if (bigger != null)
+                        {
+                            dest[i] = this.ToSlot(bigger, path, pos, size, el);
+                        }
+                    }
+
+                    return true;
+                }
+            }
+
+            var item = ReadItem(itemAddr);
+            if (item == null)
+            {
+                return false;
+            }
+
+            dest.Add(this.ToSlot(item, path, pos, size, el));
+            return true;
+        }
+
+        private IntPtr FindItemPtr(IntPtr el, int depth)
+        {
+            var item = this.ItemPtr(el);
+            if (item != IntPtr.Zero &&
+                PluginUiElementReflection.TryValidateItemAddress(item, out _, out _))
+            {
+                return item;
+            }
+
+            if (depth <= 0)
+            {
+                return IntPtr.Zero;
+            }
+
+            foreach (var kid in this.ReadVec(this.ReadUi(el).ChildrensPtr))
+            {
+                item = this.FindItemPtr(kid, depth - 1);
+                if (item != IntPtr.Zero)
+                {
+                    return item;
+                }
+            }
+
+            return IntPtr.Zero;
+        }
+
+        private static bool IsWellSize(Vector2 size) =>
+            size.X >= 32f && size.Y >= 32f && size.X <= 220f && size.Y <= 420f;
+
+        private static bool ContainsClip(Vector2 p, Vector2 clipPos, Vector2 clipSize) =>
+            p.X >= clipPos.X && p.Y >= clipPos.Y &&
+            p.X <= clipPos.X + clipSize.X && p.Y <= clipPos.Y + clipSize.Y;
+
+        private bool TryAddSlot(IntPtr slot, List<Slot> dest)
+        {
+            if (slot == IntPtr.Zero || !this.IsVisible(slot))
+            {
+                return false;
+            }
+
+            var itemAddr = this.ItemPtr(slot);
+            if (itemAddr == IntPtr.Zero ||
+                !PluginUiElementReflection.TryValidateItemAddress(itemAddr, out var path, out _))
+            {
+                return false;
+            }
+
+            var item = ReadItem(itemAddr);
+            if (item == null || !PluginUiElementReflection.TryGetAbsoluteRect(slot, out var pos, out var size))
+            {
+                return false;
+            }
+
+            if (size.X < 8f || size.Y < 8f || size.X > 280f || size.Y > 280f)
+            {
+                return false;
+            }
+
+            var made = this.ToSlot(item, path, pos, size, slot);
+            dest.Add(made);
+            return true;
         }
 
         private Slot ToSlot(Item item, string path, Vector2 pos, Vector2 size, IntPtr el)
@@ -2009,7 +2359,25 @@ namespace ItemCrafter
             this.readPtr = genericRead.MakeGenericMethod(typeof(IntPtr));
             this.readByte = genericRead.MakeGenericMethod(typeof(byte));
             this.readUi = genericRead.MakeGenericMethod(typeof(UiElementBaseOffset));
+            this.readI32 = genericRead.MakeGenericMethod(typeof(int));
             return true;
+        }
+
+        private int ReadI32(IntPtr addr)
+        {
+            if (this.readI32 == null || addr == IntPtr.Zero)
+            {
+                return 0;
+            }
+
+            try
+            {
+                return this.readI32.Invoke(this.handle, new object[] { addr }) is int v ? v : 0;
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
         private IntPtr ReadPtr(IntPtr addr) =>
@@ -2052,6 +2420,14 @@ namespace ItemCrafter
         private List<Slot> FindAllCurrency(string id)
         {
             var list = new List<Slot>();
+            foreach (var s in this.stashSlots)
+            {
+                if (IsCurrency(s, id))
+                {
+                    list.Add(s);
+                }
+            }
+
             foreach (var s in this.invSlots)
             {
                 if (IsCurrency(s, id))
