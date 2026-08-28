@@ -181,6 +181,25 @@ namespace ItemCrafter
             new("OmenOnChaosMapPackSize", "Omen of Chaotic Quantity", StepKind.Omen),
             new("OmenOnChaosMapMonsterEffectiveness", "Omen of Chaotic Effectiveness", StepKind.Omen),
             new("OmenOnChaosMapMonsterRarity", "Omen of Chaotic Monsters", StepKind.Omen),
+            new("OmenOnChaosLowestLevelMod", "Omen of Whittling", StepKind.Omen),
+            new("OmenOnChaosPrefix", "Omen of Sinistral Erasure", StepKind.Omen),
+            new("OmenOnChaosSuffix", "Omen of Dextral Erasure", StepKind.Omen),
+            new("OmenOnExaltAddTwoMods", "Omen of Greater Exaltation", StepKind.Omen),
+            new("OmenOnExaltAddPrefixes", "Omen of Sinistral Exaltation", StepKind.Omen),
+            new("OmenOnExaltAddSuffixes", "Omen of Dextral Exaltation", StepKind.Omen),
+            new("OmenOnAnnulRemovePrefixes", "Omen of Sinistral Annulment", StepKind.Omen),
+            new("OmenOnAnnulRemoveSuffixes", "Omen of Dextral Annulment", StepKind.Omen),
+            new("OmenOnDivineRerollImplicits", "Omen of the Blessed", StepKind.Omen),
+            new("OmenOnChanceNotDestroy", "Omen of Chance", StepKind.Omen),
+            new("OmenOnChanceAncientOrb", "Omen of the Ancients", StepKind.Omen),
+            new("OmenOnDivineSanctify", "Omen of Sanctification", StepKind.Omen),
+            new("OmenOnPerfectEssenceSuffix", "Omen of Dextral Crystallisation", StepKind.Omen),
+            new("OmenOnPerfectEssencePrefix", "Omen of Sinistral Crystallisation", StepKind.Omen),
+            new("OmenOnExaltConsumeQuality", "Omen of Catalysing Exaltation", StepKind.Omen),
+            new("OmenOnAbyssRerollOptions", "Omen of Abyssal Echoes", StepKind.Omen),
+            new("OmenOnAnnulRemoveAbyssMod", "Omen of Light", StepKind.Omen),
+            new("OmenOnAbyssAddPrefixes", "Omen of Sinistral Necromancy", StepKind.Omen),
+            new("OmenOnAbyssAddSuffixes", "Omen of Dextral Necromancy", StepKind.Omen),
         };
 
         public static bool TryGet(string? internalName, out CurrencyInfo info)
@@ -516,6 +535,7 @@ namespace ItemCrafter
                 !TryGet("CurrencyRemoveMod", out _) ||
                 !TryGet("CurrencyFlaskQuality", out _) ||
                 !TryGet("CurrencyIdentification", out _) ||
+                !TryGet("OmenOnChaosLowestLevelMod", out _) ||
                 TryGet("CurrencyUpgradeToRare2", out _))
             {
                 throw new InvalidOperationException("catalog");
