@@ -64,7 +64,13 @@ namespace ItemCrafter
         private readonly List<Slot> highlights = new();
         private readonly List<Slot> stashSlots = new();
         private string stashKind = string.Empty;
+        private readonly List<CachedEl> stashCache = new();
+        private IntPtr stashCacheKey;
+        private int stashCachePage = int.MinValue;
+        private string stashCacheKind = string.Empty;
         private readonly List<Slot> invSlots = new();
+        private readonly List<CachedEl> invCache = new();
+        private IntPtr invCacheKey;
 
         private Item? lastHovered;
         private Slot? lastHoveredSlot;
@@ -97,6 +103,8 @@ namespace ItemCrafter
         private enum ActKind { Move, Left, Right, ShiftOn, ShiftOff }
 
         private readonly record struct Act(ActKind Kind, Vector2 Pos);
+
+        private readonly record struct CachedEl(IntPtr El, Vector2 Pos, Vector2 Size);
 
         private sealed class Slot
         {
@@ -159,14 +167,6 @@ namespace ItemCrafter
             if (this.Settings.Recipes.Count == 0)
             {
                 this.Settings.Recipes.AddRange(DefaultRecipes());
-            }
-
-            foreach (var recipe in this.Settings.Recipes)
-            {
-                if (recipe.TargetIds.Count == 0)
-                {
-                    recipe.TargetIds.Add(string.IsNullOrEmpty(recipe.Target) ? Catalog.DefaultTarget : recipe.Target);
-                }
             }
 
             foreach (var recipe in this.Settings.Recipes)
@@ -295,7 +295,6 @@ namespace ItemCrafter
                 this.Settings.Recipes.Add(new CraftRecipe
                 {
                     Name = this.PluginText.T("settings.new_recipe", "新配方"),
-                    TargetIds = { Catalog.DefaultTarget },
                 });
             }
 
@@ -317,7 +316,6 @@ namespace ItemCrafter
                 this.Settings.Recipes.Add(new CraftRecipe
                 {
                     Name = this.PluginText.T("settings.new_recipe", "新配方"),
-                    TargetIds = { Catalog.DefaultTarget },
                 });
                 this.Settings.SelectedRecipe = this.Settings.Recipes.Count - 1;
             }
@@ -1571,22 +1569,58 @@ namespace ItemCrafter
             var ui = Core.States.InGameStateObject.GameUi;
             if (ui == null || !ui.LeftPanel.IsVisible)
             {
+                this.stashCacheKey = IntPtr.Zero;
+                this.stashCache.Clear();
+                this.ClearPicked();
                 return;
             }
 
+            IntPtr tabs = IntPtr.Zero;
+            var active = IntPtr.Zero;
             foreach (var path in StashTabsPaths)
             {
-                var tabs = this.ResolvePath(ui.LeftPanel.Address, path);
+                tabs = this.ResolvePath(ui.LeftPanel.Address, path);
                 if (tabs == IntPtr.Zero)
                 {
                     continue;
                 }
 
-                this.ProcessStashTabs(tabs);
-                if (this.stashSlots.Count > 0)
+                active = this.PickActiveTab(this.ReadVec(this.ReadUi(tabs).ChildrensPtr));
+                if (active != IntPtr.Zero)
                 {
                     break;
                 }
+            }
+
+            if (active == IntPtr.Zero)
+            {
+                this.stashCacheKey = IntPtr.Zero;
+                this.stashCache.Clear();
+                this.ClearPicked();
+                return;
+            }
+
+            var page = this.VisibleFragmentPage(active);
+            if (active == this.stashCacheKey && page == this.stashCachePage)
+            {
+                this.FillFromCache(this.stashCache, this.stashSlots);
+                this.stashKind = this.stashCacheKind;
+                return;
+            }
+
+            if (this.stashCacheKey != IntPtr.Zero)
+            {
+                this.ClearPicked();
+            }
+
+            this.ProcessStashTabs(tabs);
+            this.stashCacheKey = active;
+            this.stashCachePage = page;
+            this.stashCacheKind = this.stashKind;
+            this.stashCache.Clear();
+            foreach (var s in this.stashSlots)
+            {
+                this.stashCache.Add(new CachedEl(s.El, s.Pos, s.Size));
             }
         }
 
@@ -1601,14 +1635,83 @@ namespace ItemCrafter
             var ui = Core.States.InGameStateObject.GameUi;
             if (ui == null || !ui.RightPanel.IsVisible)
             {
+                this.invCacheKey = IntPtr.Zero;
+                this.invCache.Clear();
                 return;
             }
 
             var grid = this.ResolvePath(ui.RightPanel.Address, InventoryPath);
-            if (grid != IntPtr.Zero)
+            if (grid == IntPtr.Zero)
             {
-                this.ProcessGrid(grid, this.invSlots);
+                this.invCacheKey = IntPtr.Zero;
+                this.invCache.Clear();
+                return;
             }
+
+            if (grid == this.invCacheKey && this.invCache.Count > 0)
+            {
+                this.FillFromCache(this.invCache, this.invSlots);
+                return;
+            }
+
+            this.ProcessGrid(grid, this.invSlots);
+            this.invCacheKey = grid;
+            this.invCache.Clear();
+            foreach (var s in this.invSlots)
+            {
+                this.invCache.Add(new CachedEl(s.El, s.Pos, s.Size));
+            }
+        }
+
+        private void FillFromCache(List<CachedEl> cache, List<Slot> dest)
+        {
+            foreach (var c in cache)
+            {
+                if (c.El == IntPtr.Zero || !this.IsVisible(c.El))
+                {
+                    continue;
+                }
+
+                var itemAddr = this.FindItemPtr(c.El, 2);
+                if (itemAddr == IntPtr.Zero ||
+                    !PluginUiElementReflection.TryValidateItemAddress(itemAddr, out var path, out _))
+                {
+                    continue;
+                }
+
+                var item = ReadItem(itemAddr);
+                if (item == null)
+                {
+                    continue;
+                }
+
+                dest.Add(this.ToSlot(item, path, c.Pos, c.Size, c.El));
+            }
+        }
+
+        private int VisibleFragmentPage(IntPtr active)
+        {
+            var root = this.ResolvePath(active, new[] { 0, 0, 0, 1 });
+            if (root == IntPtr.Zero)
+            {
+                return -1;
+            }
+
+            var pages = this.ReadVec(this.ReadUi(root).ChildrensPtr);
+            if (pages.Length != 6)
+            {
+                return -1;
+            }
+
+            for (var i = 0; i < pages.Length; i++)
+            {
+                if (pages[i] != IntPtr.Zero && this.IsVisible(pages[i]))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
 
         private void ProcessStashTabs(IntPtr stashTabsContainer)
