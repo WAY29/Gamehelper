@@ -627,8 +627,11 @@ namespace ItemCrafter
 
         private void DrawModCombo(ref string id)
         {
-            ImGui.SetNextItemWidth(240);
-            if (!ImGui.BeginCombo("##mod", this.ModPreview(id)))
+            ImGui.SetNextItemWidth(216);
+            ImGui.InputTextWithHint("##modText", this.PluginText.T("settings.mod_hint", "含词缀"), ref id, 128);
+
+            ImGui.SameLine(0, 4);
+            if (!ImGui.BeginCombo("##modPick", string.Empty, ImGuiComboFlags.NoPreview | ImGuiComboFlags.HeightLarge))
             {
                 return;
             }
@@ -641,6 +644,12 @@ namespace ItemCrafter
 
             ImGui.SetNextItemWidth(-1);
             ImGui.InputTextWithHint("##filter", this.PluginText.T("settings.mod_hint", "含词缀"), ref this.modComboFilter, 128);
+            if (!string.IsNullOrWhiteSpace(this.modComboFilter) &&
+                ImGui.Selectable(this.modComboFilter + "##typed"))
+            {
+                id = this.modComboFilter.Trim();
+            }
+
             foreach (var mod in Catalog.FilterMods(this.modComboFilter))
             {
                 var selected = mod.Id.Equals(id, StringComparison.OrdinalIgnoreCase);

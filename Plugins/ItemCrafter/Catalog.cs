@@ -449,32 +449,16 @@ namespace ItemCrafter
                 return false;
             }
 
-            if (IsCatalogId(needle))
-            {
-                foreach (var name in names)
-                {
-                    if (FamilyId(name).Equals(needle, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
             foreach (var name in names)
             {
-                if (TryCatalog(name, out var mod))
+                if (FamilyId(name).Equals(needle, StringComparison.OrdinalIgnoreCase) ||
+                    Contains(name, needle))
                 {
-                    if (Contains(mod.English, needle) || Contains(mod.ZhCN, needle) || Contains(mod.ZhTW, needle))
-                    {
-                        return true;
-                    }
-
-                    continue;
+                    return true;
                 }
 
-                if (Contains(name, needle))
+                if (TryCatalog(name, out var mod) &&
+                    (Contains(mod.English, needle) || Contains(mod.ZhCN, needle) || Contains(mod.ZhTW, needle)))
                 {
                     return true;
                 }
