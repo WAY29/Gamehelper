@@ -30,7 +30,8 @@ namespace AutoStash
         public int SettingsVersion = 2;
         public bool ShowHudButtons = true;
         public bool ShowDebugWindow = true;
-        public int ClickIntervalMs = 200;
+        public int HoverDelayMs = 50;
+        public int StoreDelayMs = 50;
         public int MouseAbortPx = 48;
         public int HighlightThresholdPercent = 31;
 

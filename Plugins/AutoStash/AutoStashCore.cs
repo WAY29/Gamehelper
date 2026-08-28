@@ -164,7 +164,8 @@ namespace AutoStash
             var changed = false;
             changed |= ImGui.Checkbox(this.PluginText.Label("settings.hud", "Show in-game buttons", "AutoStashHud"), ref this.Settings.ShowHudButtons);
             changed |= ImGui.Checkbox(this.PluginText.Label("settings.debug", "Show debug window", "AutoStashDebug"), ref this.Settings.ShowDebugWindow);
-            changed |= ImGui.SliderInt(this.PluginText.Label("settings.delay", "Click interval (ms)", "AutoStashDelay"), ref this.Settings.ClickIntervalMs, 50, 1000);
+            changed |= ImGui.SliderInt(this.PluginText.Label("settings.hover_delay", "Hover item delay (ms)", "AutoStashHoverDelay"), ref this.Settings.HoverDelayMs, 0, 1000);
+            changed |= ImGui.SliderInt(this.PluginText.Label("settings.store_delay", "Store item delay (ms)", "AutoStashStoreDelay"), ref this.Settings.StoreDelayMs, 0, 1000);
             changed |= ImGui.SliderInt(this.PluginText.Label("settings.abort", "Mouse abort (px)", "AutoStashAbort"), ref this.Settings.MouseAbortPx, 5, 120);
 
             if (ImGui.CollapsingHeader(this.PluginText.Title("settings.store", "Store to stash", "AutoStashStore"), ImGuiTreeNodeFlags.DefaultOpen))
@@ -484,7 +485,7 @@ namespace AutoStash
             }
 
             this.queuedAction = action;
-            this.queuedAtMs = Environment.TickCount64 + Math.Max(50, this.Delay());
+            this.queuedAtMs = Environment.TickCount64 + Math.Max(50, this.HoverDelay());
             this.Log("queued " + this.ActionLabel(action));
         }
 
@@ -559,7 +560,7 @@ namespace AutoStash
             this.pending.Add(new Act { Kind = ActKind.ModOff });
             this.running = true;
             this.runningAction = action;
-            this.nextAtMs = Environment.TickCount64 + Math.Max(this.Delay(), 180);
+            this.nextAtMs = Environment.TickCount64 + Math.Max(this.HoverDelay(), 180);
             this.Log($"start {this.ActionLabel(action)} targets={targets.Count} acts={this.pending.Count}");
         }
 
@@ -636,7 +637,7 @@ namespace AutoStash
                     break;
             }
 
-            this.nextAtMs = Environment.TickCount64 + this.Delay();
+            this.nextAtMs = Environment.TickCount64 + (act.Kind == ActKind.Left ? this.StoreDelay() : this.HoverDelay());
             if (this.pendingIndex >= this.pending.Count)
             {
                 this.Stop("完成");
@@ -1402,12 +1403,15 @@ namespace AutoStash
             Shift = mods.Shift,
         };
 
-        private int Delay() => Math.Max(25, this.Settings.ClickIntervalMs / 2);
+        private int HoverDelay() => Math.Max(0, this.Settings.HoverDelayMs);
+
+        private int StoreDelay() => Math.Max(0, this.Settings.StoreDelayMs);
 
         private void ClampSettings()
         {
             this.Settings ??= new AutoStashSettings();
-            this.Settings.ClickIntervalMs = Math.Clamp(this.Settings.ClickIntervalMs <= 0 ? 200 : this.Settings.ClickIntervalMs, 50, 5000);
+            this.Settings.HoverDelayMs = Math.Clamp(this.Settings.HoverDelayMs, 0, 5000);
+            this.Settings.StoreDelayMs = Math.Clamp(this.Settings.StoreDelayMs, 0, 5000);
             this.Settings.MouseAbortPx = Math.Clamp(this.Settings.MouseAbortPx <= 0 ? 48 : this.Settings.MouseAbortPx, 5, 200);
             this.Settings.HighlightThresholdPercent = Math.Clamp(this.Settings.HighlightThresholdPercent <= 0 ? 31 : this.Settings.HighlightThresholdPercent, 1, 100);
             this.Settings.Store ??= new ActionSettings();
