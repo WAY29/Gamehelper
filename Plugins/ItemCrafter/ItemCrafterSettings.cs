@@ -44,7 +44,8 @@ namespace ItemCrafter
     public sealed class ItemCrafterSettings : IPSettings
     {
         public VK ToggleKey = VK.F6;
-        public int ClickDelayMs = 200;
+        public int HoverDelayMs = 50;
+        public int ClickDelayMs = 50;
         public int MouseAbortPx = 20;
         public bool ShowDebugWindow;
         public bool ShowLogWindow;

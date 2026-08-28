@@ -1,7 +1,8 @@
 {
   "plugin.description": "Craft items from a user recipe",
   "settings.toggle": "Toggle key",
-  "settings.delay": "Click delay (ms)",
+  "settings.hover_delay": "Hover item delay (ms)",
+  "settings.click_delay": "Click item delay (ms)",
   "settings.abort_px": "Mouse abort (px)",
   "settings.debug": "Show debug inspector",
   "settings.log": "Show action log",

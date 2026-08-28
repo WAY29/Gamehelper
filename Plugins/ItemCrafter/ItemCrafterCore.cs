@@ -246,10 +246,16 @@ namespace ItemCrafter
             ImGuiHelper.NonContinuousEnumComboBox("##ICToggle", ref this.Settings.ToggleKey);
 
             ImGui.AlignTextToFramePadding();
-            ImGui.Text(this.PluginText.T("settings.delay", "Click delay (ms)"));
+            ImGui.Text(this.PluginText.T("settings.hover_delay", "Hover item delay (ms)"));
             ImGui.SameLine();
             ImGui.SetNextItemWidth(180);
-            ImGui.SliderInt("##ICDelay", ref this.Settings.ClickDelayMs, 50, 1000);
+            ImGui.SliderInt("##ICHoverDelay", ref this.Settings.HoverDelayMs, 0, 1000);
+
+            ImGui.AlignTextToFramePadding();
+            ImGui.Text(this.PluginText.T("settings.click_delay", "Click item delay (ms)"));
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(180);
+            ImGui.SliderInt("##ICClickDelay", ref this.Settings.ClickDelayMs, 0, 1000);
 
             ImGui.AlignTextToFramePadding();
             ImGui.Text(this.PluginText.T("settings.abort_px", "Mouse abort (px)"));
@@ -1088,7 +1094,7 @@ namespace ItemCrafter
                     this.Stop("完成");
                 }
 
-                this.nextAtMs = Environment.TickCount64 + Math.Max(50, this.Settings.ClickDelayMs);
+                this.nextAtMs = Environment.TickCount64 + this.ClickDelay();
                 return;
             }
 
@@ -1118,8 +1124,13 @@ namespace ItemCrafter
                     break;
             }
 
-            this.nextAtMs = Environment.TickCount64 + Math.Max(50, this.Settings.ClickDelayMs);
+            this.nextAtMs = Environment.TickCount64 +
+                (act.Kind is ActKind.Left or ActKind.Right ? this.ClickDelay() : this.HoverDelay());
         }
+
+        private int HoverDelay() => Math.Max(0, this.Settings.HoverDelayMs);
+
+        private int ClickDelay() => Math.Max(0, this.Settings.ClickDelayMs);
 
         private bool LoadNextStep()
         {

@@ -1,7 +1,8 @@
 {
   "plugin.description": "按用户配方去制作物品",
   "settings.toggle": "开关热键",
-  "settings.delay": "点击间隔（毫秒）",
+  "settings.hover_delay": "悬停物品延迟（毫秒）",
+  "settings.click_delay": "点击物品延迟（毫秒）",
   "settings.abort_px": "鼠标偏离停止（像素）",
   "settings.debug": "显示调试检查器",
   "settings.log": "显示动作日志",
