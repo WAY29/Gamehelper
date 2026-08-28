@@ -58,6 +58,7 @@ github.config.json
 Plugins/**/_tmp_*
 Plugins/**/Fehler.txt
 Plugins/**/Textdokument*.txt
+**/__pycache__/
 
 # Runtime logs / error dumps (never commit)
 *.log

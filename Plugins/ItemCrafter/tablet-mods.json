@@ -1,0 +1,334 @@
+[
+  {
+    "id": "TowerDroppedItemRarityIncrease",
+    "en": "% increased Rarity of Items found in Map"
+  },
+  {
+    "id": "TowerAdditionalStoneCircle",
+    "en": "Map contains an additional Summoning Circle"
+  },
+  {
+    "id": "TowerAdditionalExile",
+    "en": "Map is inhabited by 1 additional Rogue Exiles"
+  },
+  {
+    "id": "TowerAdditionalAzmeriWisp",
+    "en": "Map contains 1 additional Azmeri Spirits"
+  },
+  {
+    "id": "TowerMonsterEffectiveness",
+    "en": "Monsters have % increased Effectiveness"
+  },
+  {
+    "id": "TowerRareChestCount",
+    "en": "Map contains additional Rare Chests"
+  },
+  {
+    "id": "TowerExperienceGainIncrease",
+    "en": "% increased Experience gain in Map"
+  },
+  {
+    "id": "TowerDroppedGoldIncrease",
+    "en": "% increased Gold found in Map"
+  },
+  {
+    "id": "TowerMonsterRarityIncrease",
+    "en": "Map has % increased Monster Rarity"
+  },
+  {
+    "id": "TowerRarePackIncrease",
+    "en": "Map has % increased number of Rare Monsters"
+  },
+  {
+    "id": "TowerMagicPackIncrease",
+    "en": "Map has % increased Magic Monsters"
+  },
+  {
+    "id": "TowerPackSizeIncrease",
+    "en": "% increased Pack Size in Map"
+  },
+  {
+    "id": "TowerDeliriumAdditionalShardsChance",
+    "en": "Delirium Fog in Map spawns % increased MirrorShards"
+  },
+  {
+    "id": "TowerMapBossExperience",
+    "en": "Map Bosses grant % increased Experience"
+  },
+  {
+    "id": "TowerMapBossWaystoneChance",
+    "en": "% increased Quantity of Waystones dropped by Map Bosses"
+  },
+  {
+    "id": "TowerMapBossAdditionalSpirit",
+    "en": "Map contains additional Azmeri Spirits"
+  },
+  {
+    "id": "TowerMapBossAdditionalEssence",
+    "en": "Map contains additional Essences"
+  },
+  {
+    "id": "TowerAdditionalEssence",
+    "en": "Map contains an additional Essence"
+  },
+  {
+    "id": "TowerMapBossAdditionalShrine",
+    "en": "Map contains additional Shrines"
+  },
+  {
+    "id": "TowerAdditionalShrine",
+    "en": "Map contains an additional Shrine"
+  },
+  {
+    "id": "TowerMapBossAdditionalStrongbox",
+    "en": "Map contains additional Strongboxes"
+  },
+  {
+    "id": "TowerAdditionalStrongbox",
+    "en": "Map contains an additional Strongbox"
+  },
+  {
+    "id": "TowerRitualOmenChance",
+    "en": "Ritual Favours in Map have % increased chance to be Omens"
+  },
+  {
+    "id": "TowerMapBossRarity",
+    "en": "% increased Rarity of Items dropped by Map Bosses"
+  },
+  {
+    "id": "TowerRitualMagicMonsters",
+    "en": "Revived Monsters from Ritual Altars in Map have % increased chance to be Rare"
+  },
+  {
+    "id": "TowerRitualRareMonsters",
+    "en": "Revived Monsters from Ritual Altars in Map have % increased chance to be Magic"
+  },
+  {
+    "id": "TowerRitualChanceForNoCost",
+    "en": "Favours Rerolled at Ritual Altars in Map have % chance to cost no Tribute"
+  },
+  {
+    "id": "TowerRitualAdditionalReroll",
+    "en": "Ritual Altars in Map allow rerolling Favours additional times"
+  },
+  {
+    "id": "TowerRitualDeferSpeed",
+    "en": "Favours Deferred at Ritual Altars in Map reappear % sooner"
+  },
+  {
+    "id": "TowerRitualDeferCostIncrease",
+    "en": "Deferring Favours at Ritual Altars in Map costs % reduced Tribute"
+  },
+  {
+    "id": "TowerRitualRerollCostIncrease",
+    "en": "Rerolling Favours at Ritual Altars in Map costs % reduced Tribute"
+  },
+  {
+    "id": "TowerRitualTributeIncrease",
+    "en": "Monsters Sacrificed at Ritual Altars in Map grant % increased Tribute"
+  },
+  {
+    "id": "TowerIncursionRareChestChance",
+    "en": "% increased chance Vaal Beacon Chests are Rare in Map"
+  },
+  {
+    "id": "TowerAbyss4AdditionalChance",
+    "en": "Map has % chance to contain four additional Abysses"
+  },
+  {
+    "id": "TowerIncursionBossChance",
+    "en": "% chance to add a Vaal Beacon Unique Monster to the Map"
+  },
+  {
+    "id": "TowerIncursionTokenChance",
+    "en": "% chance to gain an additional Crystal from Vaal Beacons in Map"
+  },
+  {
+    "id": "TowerIncursionSecondaryEncounters",
+    "en": "% increased chance Vaal Beacons summon additional Monsters in Map"
+  },
+  {
+    "id": "TowerIncursionExtraPacksChance",
+    "en": "% chance for an extra packs of Monsters around Vaal Beacons in Map"
+  },
+  {
+    "id": "TowerIncursionExtraPacks",
+    "en": "1 extra packs of Monsters around Vaal Beacons in Map"
+  },
+  {
+    "id": "TowerIncursionPackSize",
+    "en": "% increased Pack Size for Monsters around Vaal Beacons in Map"
+  },
+  {
+    "id": "TowerAbyssExtraTickets",
+    "en": "% increased chance for Desecrated Currency from Abysses in Map"
+  },
+  {
+    "id": "TowerAbyssExtraModifiers",
+    "en": "% increased chance for Abyssal monsters in Map to have Abyssal Modifiers"
+  },
+  {
+    "id": "TowerMapBossQuantity",
+    "en": "% increased Quantity of Items dropped by Map Bosses"
+  },
+  {
+    "id": "TowerAbyssIncreasedRewards",
+    "en": "Abyss Pits in Map are twice as likely to have Rewards"
+  },
+  {
+    "id": "TowerAbyssAdditionalChance",
+    "en": "Map contains 1 additional Abysses"
+  },
+  {
+    "id": "TowerAbyssDepthsChance",
+    "en": "Abysses in Map have % increased chance to lead to an Abyssal Depths"
+  },
+  {
+    "id": "TowerAbyssEffectivenessPerChasm",
+    "en": "Abyssal Monsters have % increased Effectiveness for each closed Pit, up to 100%"
+  },
+  {
+    "id": "TowerAbyssEnhancedMonstersPerChasm",
+    "en": "Abyssal Monsters in Map have increased Difficulty and Reward for each closed Pit"
+  },
+  {
+    "id": "TowerAbyssRareMonsterIncrease",
+    "en": "additional Rare Monsters are spawned from Abysses in Map"
+  },
+  {
+    "id": "TowerAbyssMonsterIncrease",
+    "en": "Abysses in Map spawn % increased Monsters"
+  },
+  {
+    "id": "TowerAdditionalExileChance",
+    "en": "Map has % increased chance to contain Rogue Exiles"
+  },
+  {
+    "id": "TowerBreachAdditionalRares",
+    "en": "Unstable Breaches in Map spawn additional Rare Monsters when Stabilised"
+  },
+  {
+    "id": "TowerBreachBossChance",
+    "en": "Unstable Breaches in Map have % increased chance to contain Vruun, Marshal of Xesht"
+  },
+  {
+    "id": "TowerBreachWombgiftLevelChance",
+    "en": "Wombgifts have % chance to drop one Level higher in Map"
+  },
+  {
+    "id": "TowerBreachWombgiftQuantity",
+    "en": "% increased Quantity of Wombgifts found in Map"
+  },
+  {
+    "id": "TowerBreachHivebloodQuantity",
+    "en": "% increased Quantity of Hiveblood found in Map"
+  },
+  {
+    "id": "TowerMapAdditionalUniqueMonsterModifier",
+    "en": "Unique Monsters have 1 additional Rare Modifiers"
+  },
+  {
+    "id": "TowerMapAdditionalModifier",
+    "en": "Map has additional random Modifiers"
+  },
+  {
+    "id": "TowerStoneCircleChance",
+    "en": "Map has % increased chance to contain a Summoning Circle"
+  },
+  {
+    "id": "TowerBreachRareMonsterPotency",
+    "en": "% increased Effectiveness of Rare Breach Monsters in Map"
+  },
+  {
+    "id": "TowerAdditionalSpiritChance",
+    "en": "Map has % increased chance to contain Azmeri Spirits"
+  },
+  {
+    "id": "TowerAdditionalEssenceChance",
+    "en": "Map has % increased chance to contain Essences"
+  },
+  {
+    "id": "TowerAdditionalStrongboxChance",
+    "en": "Map has % increased chance to contain Strongboxes"
+  },
+  {
+    "id": "TowerAdditionalShrineChance",
+    "en": "Map has % increased chance to contain Shrines"
+  },
+  {
+    "id": "TowerRareAdditionalModChance",
+    "en": "Rare Monsters in Map have a % Surpassing chance to have an additional Modifier"
+  },
+  {
+    "id": "TowerMapDroppedMapsIncrease",
+    "en": "% increased Quantity of Waystones found in Map"
+  },
+  {
+    "id": "TowerExpeditionRelicModEffect",
+    "en": "% increased Effect of Expedition Remnants in Map"
+  },
+  {
+    "id": "TowerDeliriumRareMonsterPause",
+    "en": "Slaying Rare Monsters in Map pauses the Delirium Mirror Timer for (3—5) seconds"
+  },
+  {
+    "id": "TowerDeliriumDoodadsIncrease",
+    "en": "Delirium Fog in Map spawns % increased Fracturing Mirrors"
+  },
+  {
+    "id": "TowerDeliriumPackSizeIncrease",
+    "en": "Delirium Monsters in Map have % increased Pack Size"
+  },
+  {
+    "id": "TowerDeliriumDifficultyIncrease",
+    "en": "Delirium Fog in Map applies % increased Deliriousness to Players"
+  },
+  {
+    "id": "TowerDeliriumFogPersistence",
+    "en": "Delirium Fog in Map dissipates % slower"
+  },
+  {
+    "id": "TowerDeliriumFogDissipationDelayNew",
+    "en": "Delirium Fog in Map lasts additional seconds before dissipating"
+  },
+  {
+    "id": "TowerDeliriumMonsterSplinterIncrease",
+    "en": "% increased Stack size of Simulacrum Splinters found in Map"
+  },
+  {
+    "id": "TowerExpeditionRunicMonsters",
+    "en": "Map contains % increased number of Runic Monster Markers"
+  },
+  {
+    "id": "TowerDeliriumBossChance",
+    "en": "Delirium Encounters in Map are % more likely to spawn Unique Bosses"
+  },
+  {
+    "id": "TowerExpeditionRareMonsters",
+    "en": "% increased number of Rare Expedition Monsters in Map"
+  },
+  {
+    "id": "TowerExpeditionLogbookIncrease",
+    "en": "% increased Quantity of Expedition Logbooks dropped by Runic Monsters in Map"
+  },
+  {
+    "id": "TowerExpeditionExplosionRadius",
+    "en": "% increased Expedition Explosive Radius in Map"
+  },
+  {
+    "id": "TowerExpeditionRelicIncrease",
+    "en": "Expeditions in Map have + Remnants"
+  },
+  {
+    "id": "TowerExpeditionExplosionPlacement",
+    "en": "% increased Expedition Explosive Placement Range in Map"
+  },
+  {
+    "id": "TowerExpeditionArtifactIncrease",
+    "en": "% increased quantity of Expedition Artifacts dropped by Monsters in Map"
+  },
+  {
+    "id": "TowerBreachMonsterQuantity",
+    "en": "Breaches in Map have % increased Pack Size"
+  }
+]

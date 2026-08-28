@@ -8,6 +8,7 @@ namespace ItemCrafter
     using System.Reflection;
     using ClickableTransparentOverlay.Win32;
     using GameHelper;
+    using GameHelper.Localization;
     using GameHelper.Plugin;
     using GameHelper.RemoteEnums;
     using GameHelper.RemoteObjects.Components;
@@ -41,6 +42,9 @@ namespace ItemCrafter
 
         private bool running;
         private int stepIndex = -1;
+        private readonly List<Op> ops = new();
+        private List<CraftStep>? dragList;
+        private string modComboFilter = string.Empty;
         private readonly List<Act> pending = new();
         private int pendingIndex;
         private long nextAtMs;
@@ -89,14 +93,30 @@ namespace ItemCrafter
             public Rarity Rarity;
             public int ExplicitCount;
             public int Stack = 1;
+            public int Quality;
             public bool Corrupted;
             public bool OmenOn;
             public IntPtr El;
+            public List<string> ModNames = new();
+        }
+
+        private sealed class Op
+        {
+            public required CraftStep Step;
+            public required List<(CraftIf Cond, bool Invert)> Preds;
         }
 
         public override void OnEnable(bool isGameOpened)
         {
-            Catalog.SelfCheck();
+            Catalog.Load(this.DllDirectory);
+            try
+            {
+                Catalog.SelfCheck();
+            }
+            catch (Exception ex)
+            {
+                this.log.Add($"SelfCheck: {ex.Message}");
+            }
             if (File.Exists(this.SettingPath))
             {
                 try
@@ -121,19 +141,79 @@ namespace ItemCrafter
             this.Settings.Recipes.RemoveAll(r => string.IsNullOrEmpty(r.Name) || !seen.Add(r.Name));
             if (this.Settings.Recipes.Count == 0)
             {
-                this.Settings.Recipes.Add(new CraftRecipe
+                this.Settings.Recipes.AddRange(DefaultRecipes());
+            }
+
+            foreach (var recipe in this.Settings.Recipes)
+            {
+                if (recipe.TargetIds.Count == 0)
                 {
-                    Name = "点金后崇高到6词",
-                    Steps =
-                    {
-                        new CraftStep { InternalName = Catalog.Alchemy },
-                        new CraftStep { InternalName = Catalog.Exalted, UntilAffixes = 6 },
-                    },
-                });
+                    recipe.TargetIds.Add(string.IsNullOrEmpty(recipe.Target) ? Catalog.DefaultTarget : recipe.Target);
+                }
+            }
+
+            foreach (var recipe in this.Settings.Recipes)
+            {
+                this.MigrateSteps(recipe.Steps);
             }
 
             this.Settings.SelectedRecipe = Math.Clamp(this.Settings.SelectedRecipe, 0, this.Settings.Recipes.Count - 1);
         }
+
+        private void MigrateSteps(List<CraftStep> steps)
+        {
+            foreach (var step in steps)
+            {
+                if (step.If == null)
+                {
+                    continue;
+                }
+
+                if (step.If.Conds.Count > 0 && step.If.When.Items.Count == 0)
+                {
+                    step.If.When = Catalog.FromConds(step.If.Conds);
+                    step.If.Conds.Clear();
+                }
+                else if (step.If.When.Items.Count == 0)
+                {
+                    step.If.When.Items.Add(new CraftExpr());
+                }
+
+                this.MigrateSteps(step.If.Then);
+                this.MigrateSteps(step.If.Else);
+            }
+        }
+
+        private static List<CraftRecipe> DefaultRecipes() =>
+        [
+            Recipe("普通图瓦尔",
+                Step(Catalog.Alchemy),
+                Step(Catalog.Exalted, 6),
+                Step("CurrencyCorrupt")),
+            Recipe("效用",
+                Step("OmenOnChaosMapPackSize"),
+                Step("OmenOnChaosMapItemRarity"),
+                Step("OmenOnChaosMapMonsterRarity"),
+                Step(Catalog.Alchemy),
+                Step(Catalog.Exalted, 6),
+                Step("CurrencyRerollRare"),
+                Step("CurrencyCorrupt")),
+            Recipe("103稀有",
+                Step("OmenOnChaosMapPackSize"),
+                Step("OmenOnChaosMapMonsterEffectiveness"),
+                Step("OmenOnChaosMapItemRarity"),
+                Step(Catalog.Alchemy),
+                Step(Catalog.Exalted, 5),
+                Step("CurrencyRerollRare"),
+                Step(Catalog.Exalted, 6),
+                Step("CurrencyCorrupt")),
+        ];
+
+        private static CraftRecipe Recipe(string name, params CraftStep[] steps) =>
+            new() { Name = name, Steps = [.. steps] };
+
+        private static CraftStep Step(string id, int until = 6) =>
+            new() { InternalName = id, UntilAffixes = until };
 
         public override void OnDisable()
         {
@@ -167,6 +247,20 @@ namespace ItemCrafter
             ImGui.SetNextItemWidth(180);
             ImGui.SliderInt("##ICAbortPx", ref this.Settings.MouseAbortPx, 5, 80);
 
+            ImGui.AlignTextToFramePadding();
+            ImGui.Text(this.PluginText.T("settings.affix_lang", "Name language"));
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(180);
+            var affixLang = Math.Clamp(this.Settings.AffixLanguage, 0, 3);
+            if (ImGui.Combo("##ICAffixLang", ref affixLang,
+                    [this.PluginText.T("settings.affix_lang_overlay", "Follow overlay"), "English", "简体中文", "繁體中文"], 4))
+            {
+                this.Settings.AffixLanguage = affixLang;
+                this.labelCache = null;
+                this.targetLabelCache = null;
+                this.nameLangCache = null;
+            }
+
             ImGui.Checkbox(this.PluginText.Label("settings.debug", "Show debug inspector", "ICDebug"), ref this.Settings.ShowDebugWindow);
             ImGui.SameLine();
             ImGui.Checkbox(this.PluginText.Label("settings.log", "Show action log", "ICLog"), ref this.Settings.ShowLogWindow);
@@ -174,7 +268,11 @@ namespace ItemCrafter
             ImGui.Separator();
             if (this.Settings.Recipes.Count == 0)
             {
-                this.Settings.Recipes.Add(new CraftRecipe { Name = this.PluginText.T("settings.new_recipe", "新配方") });
+                this.Settings.Recipes.Add(new CraftRecipe
+                {
+                    Name = this.PluginText.T("settings.new_recipe", "新配方"),
+                    TargetIds = { Catalog.DefaultTarget },
+                });
             }
 
             this.Settings.SelectedRecipe = Math.Clamp(this.Settings.SelectedRecipe, 0, this.Settings.Recipes.Count - 1);
@@ -192,7 +290,11 @@ namespace ItemCrafter
             ImGui.SameLine();
             if (this.IconButton("##addRecipe", DrawPlusIcon))
             {
-                this.Settings.Recipes.Add(new CraftRecipe { Name = this.PluginText.T("settings.new_recipe", "新配方") });
+                this.Settings.Recipes.Add(new CraftRecipe
+                {
+                    Name = this.PluginText.T("settings.new_recipe", "新配方"),
+                    TargetIds = { Catalog.DefaultTarget },
+                });
                 this.Settings.SelectedRecipe = this.Settings.Recipes.Count - 1;
             }
 
@@ -210,56 +312,43 @@ namespace ItemCrafter
             ImGui.SetNextItemWidth(280);
             ImGui.InputText("##ICName", ref recipe.Name, 64);
 
+            ImGui.AlignTextToFramePadding();
+            ImGui.Text(this.PluginText.T("settings.target", "Items"));
+            this.DrawTargetIds(recipe);
+
             ImGui.Spacing();
             ImGui.Text(this.PluginText.T("settings.steps", "Steps"));
+            this.DrawStepList(recipe.Steps, true);
 
-            for (var i = 0; i < recipe.Steps.Count; i++)
+            ImGui.Separator();
+            ImGui.TextWrapped(this.running
+                ? this.PluginText.F("settings.running", "Running: {0}", this.status)
+                : this.PluginText.T("settings.idle", "Idle. Open stash + inventory, press toggle."));
+        }
+
+        private void DrawTargetIds(CraftRecipe recipe)
+        {
+            var overlay = OverlayLocalization.CurrentLanguage;
+            var zhHant = overlay == OverlayLanguage.ChineseTraditional;
+            var zh = overlay == OverlayLanguage.ChineseSimplified;
+            for (var i = 0; i < recipe.TargetIds.Count; i++)
             {
-                var step = recipe.Steps[i];
+                var id = recipe.TargetIds[i];
                 ImGui.PushID(i);
-                this.IconButton("##grip", DrawGripIcon);
-                if (ImGui.BeginDragDropSource())
+                var label = id;
+                var idx = Catalog.IndexOfTarget(id);
+                if (idx >= 0 && idx < Catalog.Targets.Length &&
+                    Catalog.Targets[idx].Id.Equals(id, StringComparison.OrdinalIgnoreCase))
                 {
-                    this.dragStep = i;
-                    ImGui.SetDragDropPayload("ICStep", IntPtr.Zero, 0);
-                    ImGui.Text(this.PluginText.T($"item.{step.InternalName}", step.InternalName));
-                    ImGui.EndDragDropSource();
+                    label = Catalog.TargetLabel(Catalog.Targets[idx], this.Settings.AffixLanguage, zhHant, zh);
                 }
 
-                this.AcceptStepDrop(recipe.Steps, i);
-
+                ImGui.AlignTextToFramePadding();
+                ImGui.BulletText(label);
                 ImGui.SameLine();
-                ImGui.SetNextItemWidth(220);
-                var cur = IndexOf(step.InternalName);
-                if (ImGui.Combo("##item", ref cur, CatalogLabels(), Catalog.All.Length))
+                if (this.IconButton("##delTarget", DrawXIcon))
                 {
-                    step.InternalName = Catalog.All[cur].InternalName;
-                }
-
-                this.AcceptStepDrop(recipe.Steps, i);
-
-                if (Catalog.TryGet(step.InternalName, out var info) && info.Kind == StepKind.Exalt)
-                {
-                    ImGui.SameLine();
-                    ImGui.AlignTextToFramePadding();
-                    ImGui.Text(this.PluginText.T("settings.until", "Until"));
-                    ImGui.SameLine();
-                    ImGui.SetNextItemWidth(56);
-                    ImGui.InputInt("##until", ref step.UntilAffixes, 0);
-                    if (!ImGui.IsItemActive())
-                    {
-                        step.UntilAffixes = Catalog.ClampUntil(step.UntilAffixes);
-                    }
-
-                    ImGui.SameLine();
-                    ImGui.AlignTextToFramePadding();
-                    ImGui.Text(this.PluginText.T("settings.affixes", "mods"));
-                }
-
-                ImGui.SameLine();
-                if (this.IconButton("##delStep", DrawXIcon))
-                {
-                    recipe.Steps.RemoveAt(i);
+                    recipe.TargetIds.RemoveAt(i);
                     ImGui.PopID();
                     break;
                 }
@@ -267,15 +356,288 @@ namespace ItemCrafter
                 ImGui.PopID();
             }
 
-            if (ImGui.Button(this.PluginText.T("settings.add_step", "Add step")))
+            ImGui.SetNextItemWidth(220);
+            if (ImGui.BeginCombo("##addTarget", this.PluginText.T("settings.add_target", "Add item")))
             {
-                recipe.Steps.Add(new CraftStep());
+                for (var i = 0; i < Catalog.Targets.Length; i++)
+                {
+                    var row = Catalog.Targets[i];
+                    if (recipe.TargetIds.Exists(id => id.Equals(row.Id, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        continue;
+                    }
+
+                    if (ImGui.Selectable(this.TargetLabels()[i]))
+                    {
+                        recipe.TargetIds.Add(row.Id);
+                    }
+                }
+
+                ImGui.EndCombo();
+            }
+        }
+
+        private void DrawStepList(List<CraftStep> steps, bool addButtons)
+        {
+            for (var i = 0; i < steps.Count; i++)
+            {
+                ImGui.PushID(i);
+                if (steps[i].If != null)
+                {
+                    this.DrawIf(steps, i);
+                }
+                else
+                {
+                    this.DrawCurrencyStep(steps, i);
+                }
+
+                ImGui.PopID();
             }
 
-            ImGui.Separator();
-            ImGui.TextWrapped(this.running
-                ? this.PluginText.F("settings.running", "Running: {0}", this.status)
-                : this.PluginText.T("settings.idle", "Idle. Open stash + inventory, press toggle."));
+            if (addButtons)
+            {
+                this.DrawAddButtons(steps);
+            }
+        }
+
+        private void DrawAddButtons(List<CraftStep> steps)
+        {
+            if (ImGui.SmallButton(this.PluginText.T("settings.add_step", "Add step")))
+            {
+                steps.Add(new CraftStep());
+            }
+
+            ImGui.SameLine();
+            if (ImGui.SmallButton(this.PluginText.T("settings.add_if", "Add if")))
+            {
+                steps.Add(new CraftStep
+                {
+                    InternalName = string.Empty,
+                    If = new CraftIf { When = { Items = { new CraftExpr() } } },
+                });
+            }
+        }
+
+        private void DrawIf(List<CraftStep> steps, int i)
+        {
+            var block = steps[i].If!;
+            this.DrawGrip(steps, i, this.PluginText.T("settings.if", "If"));
+            ImGui.SameLine();
+            var open = ImGui.TreeNodeEx(
+                "##if",
+                ImGuiTreeNodeFlags.DefaultOpen | ImGuiTreeNodeFlags.Framed | ImGuiTreeNodeFlags.AllowOverlap,
+                this.PluginText.T("settings.if", "If"));
+            ImGui.SameLine();
+            this.DrawJoin(ref block.When.All);
+            ImGui.SameLine();
+            if (this.IconButton("##delIf", DrawXIcon))
+            {
+                if (open)
+                {
+                    ImGui.TreePop();
+                }
+
+                steps.RemoveAt(i);
+                return;
+            }
+
+            if (!open)
+            {
+                return;
+            }
+
+            this.DrawGroupItems(block.When);
+            this.DrawIfBranch("then", this.PluginText.T("settings.then", "Then"), block.Then);
+            this.DrawIfBranch("else", this.PluginText.T("settings.else", "Else"), block.Else);
+            ImGui.TreePop();
+        }
+
+        private void DrawJoin(ref bool all)
+        {
+            ImGui.SetNextItemWidth(72);
+            var join = all ? 0 : 1;
+            if (ImGui.Combo("##join", ref join, [this.PluginText.T("settings.and", "AND"), this.PluginText.T("settings.or", "OR")], 2))
+            {
+                all = join == 0;
+            }
+        }
+
+        private void DrawGroupItems(CraftExpr group)
+        {
+            for (var i = 0; i < group.Items.Count; i++)
+            {
+                var item = group.Items[i];
+                ImGui.PushID(i);
+                if (item.Items.Count > 0)
+                {
+                    this.DrawJoin(ref item.All);
+                    ImGui.SameLine();
+                    if (this.IconButton("##delGrp", DrawXIcon))
+                    {
+                        group.Items.RemoveAt(i);
+                        ImGui.PopID();
+                        break;
+                    }
+
+                    ImGui.Indent();
+                    this.DrawGroupItems(item);
+                    ImGui.Unindent();
+                }
+                else
+                {
+                    this.DrawModCombo(ref item.Mod);
+                    ImGui.SameLine();
+                    if (this.IconButton("##delCond", DrawXIcon))
+                    {
+                        group.Items.RemoveAt(i);
+                        ImGui.PopID();
+                        break;
+                    }
+                }
+
+                ImGui.PopID();
+            }
+
+            if (ImGui.SmallButton(this.PluginText.T("settings.add_cond", "Add condition")))
+            {
+                group.Items.Add(new CraftExpr());
+            }
+
+            ImGui.SameLine();
+            if (ImGui.SmallButton(this.PluginText.T("settings.add_group", "( )")))
+            {
+                group.Items.Add(new CraftExpr { All = false, Items = { new CraftExpr() } });
+            }
+        }
+
+        private void DrawIfBranch(string id, string label, List<CraftStep> steps)
+        {
+            ImGui.PushID(id);
+            var open = ImGui.TreeNodeEx("##br", ImGuiTreeNodeFlags.DefaultOpen | ImGuiTreeNodeFlags.AllowOverlap, label);
+            ImGui.SameLine();
+            this.DrawAddButtons(steps);
+            if (open)
+            {
+                this.DrawStepList(steps, false);
+                ImGui.TreePop();
+            }
+
+            ImGui.PopID();
+        }
+
+        private void DrawModCombo(ref string id)
+        {
+            ImGui.SetNextItemWidth(280);
+            if (!ImGui.BeginCombo("##mod", this.ModPreview(id)))
+            {
+                return;
+            }
+
+            if (ImGui.IsWindowAppearing())
+            {
+                this.modComboFilter = string.Empty;
+                ImGui.SetKeyboardFocusHere();
+            }
+
+            ImGui.SetNextItemWidth(-1);
+            ImGui.InputTextWithHint("##filter", this.PluginText.T("settings.mod_hint", "含词缀"), ref this.modComboFilter, 128);
+            foreach (var mod in Catalog.FilterMods(this.modComboFilter))
+            {
+                var selected = mod.Id.Equals(id, StringComparison.OrdinalIgnoreCase);
+                if (ImGui.Selectable($"{this.ModPreview(mod.Id)}##{mod.Id}", selected))
+                {
+                    id = mod.Id;
+                }
+
+                if (selected)
+                {
+                    ImGui.SetItemDefaultFocus();
+                }
+            }
+
+            ImGui.EndCombo();
+        }
+
+        private string ModPreview(string id)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                return this.PluginText.T("settings.mod_hint", "含词缀");
+            }
+
+            var overlay = OverlayLocalization.CurrentLanguage;
+            foreach (var mod in Catalog.Mods)
+            {
+                if (mod.Id.Equals(id, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Catalog.ModLabel(
+                        mod,
+                        this.Settings.AffixLanguage,
+                        overlay == OverlayLanguage.ChineseTraditional,
+                        overlay == OverlayLanguage.ChineseSimplified);
+                }
+            }
+
+            return id;
+        }
+
+        private void DrawCurrencyStep(List<CraftStep> steps, int i)
+        {
+            var step = steps[i];
+            this.DrawGrip(steps, i, this.ItemLabel(step.InternalName));
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(220);
+            var cur = IndexOf(step.InternalName);
+            if (ImGui.Combo("##item", ref cur, CatalogLabels(), Catalog.All.Length))
+            {
+                step.InternalName = Catalog.All[cur].InternalName;
+            }
+
+            this.AcceptStepDrop(steps, i);
+
+            if (Catalog.TryGet(step.InternalName, out var info) && info.Kind is StepKind.Exalt or StepKind.Annul or StepKind.Augment)
+            {
+                ImGui.SameLine();
+                ImGui.AlignTextToFramePadding();
+                ImGui.Text(this.PluginText.T("settings.until", "Until"));
+                ImGui.SameLine();
+                ImGui.SetNextItemWidth(56);
+                ImGui.InputInt("##until", ref step.UntilAffixes, 0);
+                if (!ImGui.IsItemActive())
+                {
+                    step.UntilAffixes = info.Kind switch
+                    {
+                        StepKind.Exalt => Catalog.ClampUntil(step.UntilAffixes),
+                        StepKind.Annul => Catalog.ClampAnnul(step.UntilAffixes),
+                        _ => Catalog.ClampAugment(step.UntilAffixes),
+                    };
+                }
+
+                ImGui.SameLine();
+                ImGui.AlignTextToFramePadding();
+                ImGui.Text(this.PluginText.T("settings.affixes", "mods"));
+            }
+
+            ImGui.SameLine();
+            if (this.IconButton("##delStep", DrawXIcon))
+            {
+                steps.RemoveAt(i);
+            }
+        }
+
+        private void DrawGrip(List<CraftStep> steps, int i, string dragLabel)
+        {
+            this.IconButton("##grip", DrawGripIcon);
+            if (ImGui.BeginDragDropSource())
+            {
+                this.dragList = steps;
+                this.dragStep = i;
+                ImGui.SetDragDropPayload("ICStep", IntPtr.Zero, 0);
+                ImGui.Text(dragLabel);
+                ImGui.EndDragDropSource();
+            }
+
+            this.AcceptStepDrop(steps, i);
         }
 
         private void AcceptStepDrop(List<CraftStep> steps, int i)
@@ -286,10 +648,14 @@ namespace ItemCrafter
             }
 
             ImGui.AcceptDragDropPayload("ICStep");
-            if (ImGui.IsMouseReleased(ImGuiMouseButton.Left) && this.dragStep >= 0 && this.dragStep != i)
+            if (ImGui.IsMouseReleased(ImGuiMouseButton.Left) &&
+                this.dragList == steps &&
+                this.dragStep >= 0 &&
+                this.dragStep != i)
             {
                 Move(steps, this.dragStep, i);
                 this.dragStep = -1;
+                this.dragList = null;
             }
 
             ImGui.EndDragDropTarget();
@@ -566,12 +932,63 @@ namespace ItemCrafter
             this.status = "start";
             this.nextAtMs = 0;
             this.log.Clear();
+            this.ops.Clear();
             this.ScanPanels();
             var recipes = this.Settings.Recipes;
-            var name = recipes.Count == 0
-                ? "?"
-                : recipes[Math.Clamp(this.Settings.SelectedRecipe, 0, recipes.Count - 1)].Name;
-            this.Log($"开始 配方={name}");
+            var recipe = recipes.Count == 0
+                ? null
+                : recipes[Math.Clamp(this.Settings.SelectedRecipe, 0, recipes.Count - 1)];
+            if (recipe != null)
+            {
+                this.Compile(recipe.Steps);
+            }
+
+            this.Log($"开始 配方={recipe?.Name ?? "?"} 步骤 {this.ops.Count}");
+        }
+
+        private bool Passes(Op op, Slot slot)
+        {
+            foreach (var (cond, invert) in op.Preds)
+            {
+                if (!Catalog.MatchesConds(slot.ModNames, cond.When, invert))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private void Compile(List<CraftStep> roots)
+        {
+            var q = new Queue<(List<CraftStep> Steps, List<(CraftIf Cond, bool Invert)> Pred)>();
+            q.Enqueue((roots, []));
+            while (q.Count > 0)
+            {
+                var (steps, pred) = q.Dequeue();
+                foreach (var step in steps)
+                {
+                    if (step.If == null && Catalog.TryGet(step.InternalName, out _))
+                    {
+                        this.ops.Add(new Op { Step = step, Preds = pred.ToList() });
+                    }
+                }
+
+                foreach (var step in steps)
+                {
+                    if (step.If == null)
+                    {
+                        continue;
+                    }
+
+                    var thenPred = pred.ToList();
+                    thenPred.Add((step.If, false));
+                    var elsePred = pred.ToList();
+                    elsePred.Add((step.If, true));
+                    q.Enqueue((step.If.Then, thenPred));
+                    q.Enqueue((step.If.Else, elsePred));
+                }
+            }
         }
 
         private void Stop(string reason)
@@ -681,11 +1098,12 @@ namespace ItemCrafter
 
             var recipe = recipes[Math.Clamp(this.Settings.SelectedRecipe, 0, recipes.Count - 1)];
             this.stepIndex++;
-            while (this.stepIndex < recipe.Steps.Count)
+            while (this.stepIndex < this.ops.Count)
             {
                 this.ScanStash();
                 this.ScanInv();
-                var step = recipe.Steps[this.stepIndex];
+                var op = this.ops[this.stepIndex];
+                var step = op.Step;
                 if (!Catalog.TryGet(step.InternalName, out var info))
                 {
                     this.stepIndex++;
@@ -708,7 +1126,7 @@ namespace ItemCrafter
                     var toClick = omens.FindAll(o => !o.OmenOn);
                     if (toClick.Count == 0)
                     {
-                        this.Log($"步骤 {this.stepIndex + 1}: {this.PluginText.T($"item.{info.InternalName}", info.English)} 已启用，跳过");
+                        this.Log($"步骤 {this.stepIndex + 1}: {this.ItemLabel(info.InternalName, info.English)} 已启用，跳过");
                         this.stepIndex++;
                         continue;
                     }
@@ -722,7 +1140,7 @@ namespace ItemCrafter
                         this.highlights.Add(omen);
                     }
 
-                    this.Log($"步骤 {this.stepIndex + 1}: {this.PluginText.T($"item.{info.InternalName}", info.English)} 预兆 x{toClick.Count}");
+                    this.Log($"步骤 {this.stepIndex + 1}: {this.ItemLabel(info.InternalName, info.English)} 预兆 x{toClick.Count}");
                     this.status = info.English;
                     return true;
                 }
@@ -737,12 +1155,10 @@ namespace ItemCrafter
                 var targets = new List<Slot>();
                 foreach (var stone in this.stashSlots)
                 {
-                    if (!Catalog.IsWaystone(stone.Path, stone.InternalName))
-                    {
-                        continue;
-                    }
-
-                    if (!Catalog.IsEligible(info.Kind, stone.Rarity, stone.ExplicitCount, stone.Corrupted, step.UntilAffixes))
+                    if (!Catalog.MatchesAny(recipe.TargetIds, stone.Path, stone.InternalName, stone.DisplayName) ||
+                        !Catalog.CanApply(info, stone.Path) ||
+                        !this.Passes(op, stone) ||
+                        !Catalog.IsEligible(info.Kind, stone.Rarity, stone.ExplicitCount, stone.Corrupted, step.UntilAffixes, stone.Quality))
                     {
                         continue;
                     }
@@ -753,7 +1169,7 @@ namespace ItemCrafter
                 targets.Sort(GridOrder);
                 if (targets.Count == 0)
                 {
-                    this.Log($"步骤 {this.stepIndex + 1}: {this.PluginText.T($"item.{info.InternalName}", info.English)} 无目标，跳过");
+                    this.Log($"步骤 {this.stepIndex + 1}: {this.ItemLabel(info.InternalName, info.English)} 无目标，跳过");
                     this.stepIndex++;
                     continue;
                 }
@@ -764,9 +1180,7 @@ namespace ItemCrafter
                 this.pending.Add(new Act(ActKind.ShiftOn, default));
                 foreach (var t in targets)
                 {
-                    var clicks = info.Kind == StepKind.Exalt
-                        ? Catalog.ExaltClicks(t.ExplicitCount, step.UntilAffixes)
-                        : 1;
+                    var clicks = Catalog.Clicks(info.Kind, t.ExplicitCount, step.UntilAffixes, t.Quality);
                     var pos = Center(t);
                     this.pending.Add(new Act(ActKind.Move, pos));
                     for (var i = 0; i < clicks; i++)
@@ -779,7 +1193,7 @@ namespace ItemCrafter
 
                 this.pending.Add(new Act(ActKind.ShiftOff, default));
 
-                this.Log($"步骤 {this.stepIndex + 1}: {this.PluginText.T($"item.{info.InternalName}", info.English)} 目标 {targets.Count}");
+                this.Log($"步骤 {this.stepIndex + 1}: {this.ItemLabel(info.InternalName, info.English)} 目标 {targets.Count}");
                 this.status = info.English;
                 return true;
             }
@@ -1063,13 +1477,27 @@ namespace ItemCrafter
 
             var rarity = Rarity.Normal;
             var explicitCount = 0;
+            var modNames = new List<string>();
             if (item.TryGetComponent<Mods>(out var mods, shouldCache: false))
             {
                 rarity = mods.Rarity;
                 explicitCount = mods.ExplicitMods.Count;
+                foreach (var mod in mods.ExplicitMods)
+                {
+                    if (!string.IsNullOrEmpty(mod.name))
+                    {
+                        modNames.Add(mod.name);
+                    }
+                }
             }
 
             var stack = item.TryGetComponent<Stack>(out var st) ? Math.Max(1, st.Count) : 1;
+            var quality = 0;
+            if (this.TryGetCompAddr(item, "Quality", out var qualityAddr) && this.EnsureMem())
+            {
+                quality = (int)this.ReadU32(qualityAddr + 0x18);
+            }
+
             return new Slot
             {
                 Item = item,
@@ -1080,7 +1508,9 @@ namespace ItemCrafter
                 DisplayName = b?.BaseItemName ?? internalName,
                 Rarity = rarity,
                 ExplicitCount = explicitCount,
+                ModNames = modNames,
                 Stack = stack,
+                Quality = quality,
                 Corrupted = this.IsCorrupted(b),
                 OmenOn = this.IsOmenOn(item),
                 El = el,
@@ -1575,6 +2005,52 @@ namespace ItemCrafter
         }
 
         private string[]? labelCache;
+        private string[]? targetLabelCache;
+        private Dictionary<string, string>? nameLangCache;
+        private int nameLangCacheFor = int.MinValue;
+        private string nameLangFileCached = string.Empty;
+
+        private string ItemLabel(string internalName, string? fallback = null)
+        {
+            if (Catalog.TryGet(internalName, out var info))
+            {
+                fallback ??= info.English;
+            }
+
+            return this.GameText($"item.{internalName}", fallback ?? internalName);
+        }
+
+        private string NameLangFile()
+        {
+            return Math.Clamp(this.Settings.AffixLanguage, 0, 3) switch
+            {
+                1 => "en-US",
+                2 => "zh-CN",
+                3 => "zh-Hant",
+                _ => OverlayLocalization.LanguageCodes(OverlayLocalization.CurrentLanguage)[0],
+            };
+        }
+
+        private string GameText(string key, string fallback)
+        {
+            var file = this.NameLangFile();
+            if (this.nameLangCache == null ||
+                this.nameLangCacheFor != this.Settings.AffixLanguage ||
+                file != this.nameLangFileCached)
+            {
+                this.nameLangCacheFor = this.Settings.AffixLanguage;
+                this.nameLangFileCached = file;
+                var path = Path.Join(this.DllDirectory, "Localization", file + ".json");
+                this.nameLangCache = File.Exists(path)
+                    ? JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(path))
+                    : null;
+                this.nameLangCache ??= new Dictionary<string, string>(StringComparer.Ordinal);
+            }
+
+            return this.nameLangCache.TryGetValue(key, out var value) && !string.IsNullOrEmpty(value)
+                ? value
+                : fallback;
+        }
 
         private string[] CatalogLabels()
         {
@@ -1587,10 +2063,30 @@ namespace ItemCrafter
             for (var i = 0; i < Catalog.All.Length; i++)
             {
                 var row = Catalog.All[i];
-                this.labelCache[i] = this.PluginText.T($"item.{row.InternalName}", row.English);
+                this.labelCache[i] = this.ItemLabel(row.InternalName, row.English);
             }
 
             return this.labelCache;
+        }
+
+        private string[] TargetLabels()
+        {
+            if (this.targetLabelCache != null)
+            {
+                return this.targetLabelCache;
+            }
+
+            var overlay = OverlayLocalization.CurrentLanguage;
+            var zhHant = overlay == OverlayLanguage.ChineseTraditional;
+            var zh = overlay == OverlayLanguage.ChineseSimplified;
+            this.targetLabelCache = new string[Catalog.Targets.Length];
+            for (var i = 0; i < Catalog.Targets.Length; i++)
+            {
+                this.targetLabelCache[i] = Catalog.TargetLabel(
+                    Catalog.Targets[i], this.Settings.AffixLanguage, zhHant, zh);
+            }
+
+            return this.targetLabelCache;
         }
     }
 }

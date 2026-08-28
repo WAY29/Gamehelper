@@ -1,0 +1,58 @@
+[
+  {
+    "id": "GenericAugment",
+    "path": "Metadata/Items/TowerAugment/GenericAugment",
+    "en": "Irradiated Tablet",
+    "zh_CN": "能量辐照石板",
+    "zh_TW": "輻照碑牌"
+  },
+  {
+    "id": "BreachAugment",
+    "path": "Metadata/Items/TowerAugment/BreachAugment",
+    "en": "Breach Tablet",
+    "zh_CN": "裂隙石板",
+    "zh_TW": "裂痕碑牌"
+  },
+  {
+    "id": "ExpeditionAugment",
+    "path": "Metadata/Items/TowerAugment/ExpeditionAugment",
+    "en": "Expedition Tablet",
+    "zh_CN": "先祖秘藏石板",
+    "zh_TW": "探險碑牌"
+  },
+  {
+    "id": "DeliriumAugment",
+    "path": "Metadata/Items/TowerAugment/DeliriumAugment",
+    "en": "Delirium Tablet",
+    "zh_CN": "惊悸迷雾石板",
+    "zh_TW": "譫妄碑牌"
+  },
+  {
+    "id": "RitualAugment",
+    "path": "Metadata/Items/TowerAugment/RitualAugment",
+    "en": "Ritual Tablet",
+    "zh_CN": "驱灵仪式石板",
+    "zh_TW": "祭祀碑牌"
+  },
+  {
+    "id": "AbyssAugment",
+    "path": "Metadata/Items/TowerAugment/AbyssAugment",
+    "en": "Abyss Tablet",
+    "zh_CN": "深渊石板",
+    "zh_TW": "深淵碑牌"
+  },
+  {
+    "id": "MapBossAugment",
+    "path": "Metadata/Items/TowerAugment/MapBossAugment",
+    "en": "Overseer Tablet",
+    "zh_CN": "霸主石板",
+    "zh_TW": "總督碑牌"
+  },
+  {
+    "id": "IncursionAugment",
+    "path": "Metadata/Items/TowerAugment/IncursionAugment",
+    "en": "Temple Tablet",
+    "zh_CN": "神庙石板",
+    "zh_TW": "神廟碑牌"
+  }
+]

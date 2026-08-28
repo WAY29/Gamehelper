@@ -1,0 +1,114 @@
+[
+  {
+    "id": "MapKeyTier1",
+    "path": "Metadata/Items/Maps/MapKeyTier1",
+    "en": "Waystone (Tier 1)",
+    "zh_CN": "引路石（ 1 阶）",
+    "zh_TW": "換界石（階級 1）"
+  },
+  {
+    "id": "MapKeyTier2",
+    "path": "Metadata/Items/Maps/MapKeyTier2",
+    "en": "Waystone (Tier 2)",
+    "zh_CN": "引路石（ 2 阶）",
+    "zh_TW": "換界石（階級 2）"
+  },
+  {
+    "id": "MapKeyTier3",
+    "path": "Metadata/Items/Maps/MapKeyTier3",
+    "en": "Waystone (Tier 3)",
+    "zh_CN": "引路石（ 3 阶）",
+    "zh_TW": "換界石（階級 3）"
+  },
+  {
+    "id": "MapKeyTier4",
+    "path": "Metadata/Items/Maps/MapKeyTier4",
+    "en": "Waystone (Tier 4)",
+    "zh_CN": "引路石（ 4 阶）",
+    "zh_TW": "換界石（階級 4）"
+  },
+  {
+    "id": "MapKeyTier5",
+    "path": "Metadata/Items/Maps/MapKeyTier5",
+    "en": "Waystone (Tier 5)",
+    "zh_CN": "引路石（ 5 阶）",
+    "zh_TW": "換界石（階級 5）"
+  },
+  {
+    "id": "MapKeyTier6",
+    "path": "Metadata/Items/Maps/MapKeyTier6",
+    "en": "Waystone (Tier 6)",
+    "zh_CN": "引路石（ 6 阶）",
+    "zh_TW": "換界石（階級 6）"
+  },
+  {
+    "id": "MapKeyTier7",
+    "path": "Metadata/Items/Maps/MapKeyTier7",
+    "en": "Waystone (Tier 7)",
+    "zh_CN": "引路石（ 7 阶）",
+    "zh_TW": "換界石（階級 7）"
+  },
+  {
+    "id": "MapKeyTier8",
+    "path": "Metadata/Items/Maps/MapKeyTier8",
+    "en": "Waystone (Tier 8)",
+    "zh_CN": "引路石（ 8 阶）",
+    "zh_TW": "換界石（階級 8）"
+  },
+  {
+    "id": "MapKeyTier9",
+    "path": "Metadata/Items/Maps/MapKeyTier9",
+    "en": "Waystone (Tier 9)",
+    "zh_CN": "引路石（ 9 阶）",
+    "zh_TW": "換界石（階級 9）"
+  },
+  {
+    "id": "MapKeyTier10",
+    "path": "Metadata/Items/Maps/MapKeyTier10",
+    "en": "Waystone (Tier 10)",
+    "zh_CN": "引路石（ 10 阶）",
+    "zh_TW": "換界石（階級 10）"
+  },
+  {
+    "id": "MapKeyTier11",
+    "path": "Metadata/Items/Maps/MapKeyTier11",
+    "en": "Waystone (Tier 11)",
+    "zh_CN": "引路石（ 11 阶）",
+    "zh_TW": "換界石（階級 11）"
+  },
+  {
+    "id": "MapKeyTier12",
+    "path": "Metadata/Items/Maps/MapKeyTier12",
+    "en": "Waystone (Tier 12)",
+    "zh_CN": "引路石（ 12 阶）",
+    "zh_TW": "換界石（階級 12）"
+  },
+  {
+    "id": "MapKeyTier13",
+    "path": "Metadata/Items/Maps/MapKeyTier13",
+    "en": "Waystone (Tier 13)",
+    "zh_CN": "引路石（ 13 阶）",
+    "zh_TW": "換界石（階級 13）"
+  },
+  {
+    "id": "MapKeyTier14",
+    "path": "Metadata/Items/Maps/MapKeyTier14",
+    "en": "Waystone (Tier 14)",
+    "zh_CN": "引路石（ 14 阶）",
+    "zh_TW": "換界石（階級 14）"
+  },
+  {
+    "id": "MapKeyTier15",
+    "path": "Metadata/Items/Maps/MapKeyTier15",
+    "en": "Waystone (Tier 15)",
+    "zh_CN": "引路石（ 15 阶）",
+    "zh_TW": "換界石（階級 15）"
+  },
+  {
+    "id": "MapKeyTier16",
+    "path": "Metadata/Items/Maps/MapKeyTier16",
+    "en": "Waystone (Tier 16)",
+    "zh_CN": "引路石（ 16 阶）",
+    "zh_TW": "換界石（階級 16）"
+  }
+]
