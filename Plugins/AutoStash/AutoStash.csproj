@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>false</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="button-arrow-left.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="button-arrow-right.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Localization\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\GameHelper\GameHelper.csproj">
+      <Private>false</Private>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+    </ProjectReference>
+    <ProjectReference Include="..\..\GameOffsets\GameOffsets.csproj">
+      <Private>false</Private>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+    </ProjectReference>
+  </ItemGroup>
+
+  <Target Name="CopyFiles" AfterTargets="Build">
+    <ItemGroup>
+      <_AutoStashDeployFiles Include="$(OutDir)$(TargetName)$(TargetExt);$(OutDir)$(TargetName).pdb;$(OutDir)button-arrow-left.png;$(OutDir)button-arrow-right.png" />
+      <_AutoStashLocFiles Include="$(OutDir)Localization\*.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_AutoStashDeployFiles)"
+          DestinationFolder="..\..\GameHelper\$(OutDir)Plugins\$(ProjectName)"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_AutoStashLocFiles)"
+          DestinationFolder="..\..\GameHelper\$(OutDir)Plugins\$(ProjectName)\Localization"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
