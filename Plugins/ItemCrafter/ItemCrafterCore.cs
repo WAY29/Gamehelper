@@ -51,6 +51,8 @@ namespace ItemCrafter
         private bool running;
         private int stepIndex = -1;
         private readonly List<Op> ops = new();
+        private readonly List<Frame> frames = new();
+        private CraftRecipe? activeRecipe;
         private List<CraftStep>? dragList;
         private string modComboFilter = string.Empty;
         private readonly List<Act> pending = new();
@@ -129,6 +131,17 @@ namespace ItemCrafter
         {
             public required CraftStep Step;
             public required List<(CraftIf Cond, bool Invert)> Preds;
+        }
+
+        private sealed class Frame
+        {
+            public required List<CraftStep> Steps;
+            public int I;
+            public required List<(CraftIf Cond, bool Invert)> Preds;
+            public CraftIf? Loop;
+            public List<(CraftIf Cond, bool Invert)> ParentPreds = [];
+            public int Iters;
+            public bool DoWhileFirst;
         }
 
         public override void OnEnable(bool isGameOpened)
@@ -461,23 +474,43 @@ namespace ItemCrafter
             ImGui.SameLine();
             if (ImGui.SmallButton(this.PluginText.T("settings.add_if", "Add if")))
             {
-                steps.Add(new CraftStep
-                {
-                    InternalName = string.Empty,
-                    If = new CraftIf { When = { Items = { new CraftExpr() } } },
-                });
+                steps.Add(this.NewBlock(0));
+            }
+
+            ImGui.SameLine();
+            if (ImGui.SmallButton(this.PluginText.T("settings.add_while", "Add while")))
+            {
+                steps.Add(this.NewBlock(1));
+            }
+
+            ImGui.SameLine();
+            if (ImGui.SmallButton(this.PluginText.T("settings.add_dowhile", "Add do-while")))
+            {
+                steps.Add(this.NewBlock(2));
             }
         }
+
+        private CraftStep NewBlock(int loop) => new()
+        {
+            InternalName = string.Empty,
+            If = new CraftIf { Loop = loop, When = { Items = { new CraftExpr() } } },
+        };
 
         private void DrawIf(List<CraftStep> steps, int i)
         {
             var block = steps[i].If!;
-            this.DrawGrip(steps, i, this.PluginText.T("settings.if", "If"));
+            var title = block.Loop switch
+            {
+                1 => this.PluginText.T("settings.while", "While"),
+                2 => this.PluginText.T("settings.dowhile", "Do-While"),
+                _ => this.PluginText.T("settings.if", "If"),
+            };
+            this.DrawGrip(steps, i, title);
             ImGui.SameLine();
             var open = ImGui.TreeNodeEx(
                 "##if",
                 ImGuiTreeNodeFlags.DefaultOpen | ImGuiTreeNodeFlags.Framed | ImGuiTreeNodeFlags.AllowOverlap,
-                this.PluginText.T("settings.if", "If"));
+                title);
             ImGui.SameLine();
             this.DrawJoin(ref block.When.All);
             ImGui.SameLine();
@@ -499,7 +532,11 @@ namespace ItemCrafter
 
             this.DrawGroupItems(block.When);
             this.DrawIfBranch("then", this.PluginText.T("settings.then", "Then"), block.Then);
-            this.DrawIfBranch("else", this.PluginText.T("settings.else", "Else"), block.Else);
+            if (block.Loop == 0)
+            {
+                this.DrawIfBranch("else", this.PluginText.T("settings.else", "Else"), block.Else);
+            }
+
             ImGui.TreePop();
         }
 
@@ -1025,17 +1062,18 @@ namespace ItemCrafter
             this.nextAtMs = 0;
             this.log.Clear();
             this.ops.Clear();
+            this.frames.Clear();
             this.ScanPanels();
             var recipes = this.Settings.Recipes;
-            var recipe = recipes.Count == 0
+            this.activeRecipe = recipes.Count == 0
                 ? null
                 : recipes[Math.Clamp(this.Settings.SelectedRecipe, 0, recipes.Count - 1)];
-            if (recipe != null)
+            if (this.activeRecipe != null)
             {
-                this.Compile(recipe.Steps);
+                this.frames.Add(new Frame { Steps = this.activeRecipe.Steps, Preds = [] });
             }
 
-            this.Log($"开始 配方={recipe?.Name ?? "?"} 步骤 {this.ops.Count}");
+            this.Log($"开始 配方={this.activeRecipe?.Name ?? "?"}");
         }
 
         private bool Passes(Op op, Slot slot)
@@ -1051,36 +1089,109 @@ namespace ItemCrafter
             return true;
         }
 
-        private void Compile(List<CraftStep> roots)
+        private static List<(CraftIf Cond, bool Invert)> WithPred(
+            List<(CraftIf Cond, bool Invert)> pred, CraftIf extra, bool invert)
         {
-            var q = new Queue<(List<CraftStep> Steps, List<(CraftIf Cond, bool Invert)> Pred)>();
-            q.Enqueue((roots, []));
-            while (q.Count > 0)
+            var next = pred.ToList();
+            next.Add((extra, invert));
+            return next;
+        }
+
+        private void EnterBlock(CraftIf block, List<(CraftIf Cond, bool Invert)> pred)
+        {
+            if (block.Loop == 1)
             {
-                var (steps, pred) = q.Dequeue();
-                foreach (var step in steps)
+                if (!this.AnyMatch(block, pred))
                 {
-                    if (step.If == null && Catalog.TryGet(step.InternalName, out _))
-                    {
-                        this.ops.Add(new Op { Step = step, Preds = pred.ToList() });
-                    }
+                    return;
                 }
 
-                foreach (var step in steps)
+                this.frames.Add(new Frame
                 {
-                    if (step.If == null)
-                    {
-                        continue;
-                    }
+                    Steps = block.Then,
+                    Preds = WithPred(pred, block, false),
+                    Loop = block,
+                    ParentPreds = pred.ToList(),
+                });
+                return;
+            }
 
-                    var thenPred = pred.ToList();
-                    thenPred.Add((step.If, false));
-                    var elsePred = pred.ToList();
-                    elsePred.Add((step.If, true));
-                    q.Enqueue((step.If.Then, thenPred));
-                    q.Enqueue((step.If.Else, elsePred));
+            if (block.Loop == 2)
+            {
+                this.frames.Add(new Frame
+                {
+                    Steps = block.Then,
+                    Preds = pred.ToList(),
+                    Loop = block,
+                    ParentPreds = pred.ToList(),
+                    DoWhileFirst = true,
+                });
+                return;
+            }
+
+            if (block.Else.Count > 0)
+            {
+                this.frames.Add(new Frame { Steps = block.Else, Preds = WithPred(pred, block, true) });
+            }
+
+            this.frames.Add(new Frame { Steps = block.Then, Preds = WithPred(pred, block, false) });
+        }
+
+        private bool ContinueLoop(Frame f)
+        {
+            if (f.Loop == null)
+            {
+                return false;
+            }
+
+            f.Iters++;
+            if (f.Iters >= 500)
+            {
+                this.Stop("循环过多");
+                return false;
+            }
+
+            this.ScanStash();
+            this.ScanInv();
+            this.RebindPicked();
+            if (f.DoWhileFirst)
+            {
+                f.DoWhileFirst = false;
+                f.Preds = WithPred(f.ParentPreds, f.Loop, false);
+            }
+
+            if (!this.AnyMatch(f.Loop, f.ParentPreds))
+            {
+                return false;
+            }
+
+            f.I = 0;
+            return true;
+        }
+
+        private bool AnyMatch(CraftIf cond, List<(CraftIf Cond, bool Invert)> pred)
+        {
+            var op = new Op { Step = new CraftStep(), Preds = WithPred(pred, cond, false) };
+            foreach (var stone in this.stashSlots)
+            {
+                if (this.IsRecipeTarget(stone) && this.Passes(op, stone))
+                {
+                    return true;
                 }
             }
+
+            return false;
+        }
+
+        private bool IsRecipeTarget(Slot stone)
+        {
+            if (this.pickedSlot != null)
+            {
+                return stone.El == this.pickedSlot.El || Contains(stone, Center(this.pickedSlot));
+            }
+
+            return this.activeRecipe != null &&
+                   Catalog.MatchesAny(this.activeRecipe.TargetIds, stone.Path, stone.InternalName, stone.DisplayName);
         }
 
         private void Stop(string reason)
@@ -1187,26 +1298,46 @@ namespace ItemCrafter
 
         private bool LoadNextStep()
         {
-            var recipes = this.Settings.Recipes;
-            if (recipes.Count == 0)
+            if (this.activeRecipe == null)
             {
                 return false;
             }
 
-            var recipe = recipes[Math.Clamp(this.Settings.SelectedRecipe, 0, recipes.Count - 1)];
-            this.stepIndex++;
-            while (this.stepIndex < this.ops.Count)
+            while (this.frames.Count > 0)
             {
                 this.ScanStash();
                 this.ScanInv();
                 this.RebindPicked();
-                var op = this.ops[this.stepIndex];
-                var step = op.Step;
-                if (!Catalog.TryGet(step.InternalName, out var info))
+                var frame = this.frames[^1];
+                if (frame.I >= frame.Steps.Count)
                 {
-                    this.stepIndex++;
+                    if (!this.ContinueLoop(frame))
+                    {
+                        this.frames.RemoveAt(this.frames.Count - 1);
+                    }
+
+                    if (!this.running)
+                    {
+                        return true;
+                    }
+
                     continue;
                 }
+
+                var step = frame.Steps[frame.I++];
+                if (step.If != null)
+                {
+                    this.EnterBlock(step.If, frame.Preds);
+                    continue;
+                }
+
+                if (!Catalog.TryGet(step.InternalName, out var info))
+                {
+                    continue;
+                }
+
+                var op = new Op { Step = step, Preds = frame.Preds };
+                this.stepIndex++;
 
                 this.pending.Clear();
                 this.pendingIndex = 0;
@@ -1224,8 +1355,7 @@ namespace ItemCrafter
                     var toClick = omens.FindAll(o => !o.OmenOn);
                     if (toClick.Count == 0)
                     {
-                        this.Log($"步骤 {this.stepIndex + 1}: {this.ItemLabel(info.InternalName, info.English)} 已启用，跳过");
-                        this.stepIndex++;
+                        this.Log($"步骤 {this.stepIndex}: {this.ItemLabel(info.InternalName, info.English)} 已启用，跳过");
                         continue;
                     }
 
@@ -1253,19 +1383,8 @@ namespace ItemCrafter
                 var targets = new List<Slot>();
                 foreach (var stone in this.stashSlots)
                 {
-                    if (this.pickedSlot != null)
-                    {
-                        if (stone.El != this.pickedSlot.El && !Contains(stone, Center(this.pickedSlot)))
-                        {
-                            continue;
-                        }
-                    }
-                    else if (!Catalog.MatchesAny(recipe.TargetIds, stone.Path, stone.InternalName, stone.DisplayName))
-                    {
-                        continue;
-                    }
-
-                    if (!Catalog.CanApply(info, stone.Path) ||
+                    if (!this.IsRecipeTarget(stone) ||
+                        !Catalog.CanApply(info, stone.Path) ||
                         !this.Passes(op, stone) ||
                         !Catalog.IsEligible(info.Kind, stone.Rarity, stone.ExplicitCount, stone.Corrupted, step.UntilAffixes, stone.Quality, stone.Identified))
                     {
@@ -1278,8 +1397,7 @@ namespace ItemCrafter
                 targets.Sort(GridOrder);
                 if (targets.Count == 0)
                 {
-                    this.Log($"步骤 {this.stepIndex + 1}: {this.ItemLabel(info.InternalName, info.English)} 无目标，跳过");
-                    this.stepIndex++;
+                    this.Log($"步骤 {this.stepIndex}: {this.ItemLabel(info.InternalName, info.English)} 无目标，跳过");
                     continue;
                 }
 

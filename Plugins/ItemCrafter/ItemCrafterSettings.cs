@@ -20,6 +20,7 @@ namespace ItemCrafter
 
     public sealed class CraftIf
     {
+        public int Loop;
         public CraftExpr When = new();
         public List<CraftCond> Conds = new();
         public List<CraftStep> Then = new();
