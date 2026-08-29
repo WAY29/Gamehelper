@@ -8,6 +8,8 @@
   "settings.store": "存入倉庫",
   "settings.store.click": "存入點擊修飾鍵",
   "settings.store.hotkey": "存入熱鍵",
+  "settings.store.options": "存入設定",
+  "settings.store.exclude_corrupted_waystones": "排除腐化換界石",
   "settings.store.disabled_cells": "停用的背包格子",
   "settings.store.disable_page": "方案",
   "settings.take": "從倉庫取出",

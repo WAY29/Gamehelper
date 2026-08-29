@@ -36,6 +36,7 @@ namespace AutoStash
         public int HighlightThresholdPercent = 31;
 
         public ActionSettings Store = new();
+        public bool ExcludeCorruptedWaystones;
         public ActionSettings Take = new();
         public ActionSettings TakeHighlighted = new();
 

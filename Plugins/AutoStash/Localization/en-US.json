@@ -8,6 +8,8 @@
   "settings.store": "Store to stash",
   "settings.store.click": "Store click modifiers",
   "settings.store.hotkey": "Store hotkey",
+  "settings.store.options": "Store settings",
+  "settings.store.exclude_corrupted_waystones": "Skip corrupted waystones",
   "settings.store.disabled_cells": "Disabled inventory cells",
   "settings.store.disable_page": "Preset",
   "settings.take": "Take from stash",

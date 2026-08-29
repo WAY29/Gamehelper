@@ -42,6 +42,8 @@ namespace AutoStash
         private const int StashEntryStride = 0x90;
         private const int PlayerServerDataPtrOff = 0x48;
         private const int ServerStashTabSize = 104;
+        private const int BaseFlagsOffset = 0xC7;
+        private const byte CorruptedBit = 0x01;
         private static readonly int[][] StashFramePaths =
         {
             new[] { 2, 0, 0, 0 },
@@ -74,6 +76,7 @@ namespace AutoStash
         private MethodInfo? readWs;
         private MethodInfo? readStdWString;
         private MethodInfo? readU32;
+        private MethodInfo? readByte;
 
         private Grid? inventoryGrid;
         private Vector2 stashPanelPos;
@@ -124,6 +127,7 @@ namespace AutoStash
         {
             public IntPtr Address;
             public string Name = string.Empty;
+            public bool CorruptedWaystone;
             public List<Cell> Cells = new();
         }
 
@@ -193,6 +197,13 @@ namespace AutoStash
                 ImGui.Separator();
                 ImGui.Text(this.PluginText.T("settings.store.disabled_cells", "Disabled inventory cells"));
                 changed |= this.DrawDisableGrid();
+            }
+
+            if (ImGui.CollapsingHeader(this.PluginText.Title("settings.store.options", "Store settings", "AutoStashStoreOptions"), ImGuiTreeNodeFlags.DefaultOpen))
+            {
+                changed |= ImGui.Checkbox(
+                    this.PluginText.Label("settings.store.exclude_corrupted_waystones", "Skip corrupted waystones", "AutoStashSkipCorruptWs"),
+                    ref this.Settings.ExcludeCorruptedWaystones);
             }
 
             if (ImGui.CollapsingHeader(this.PluginText.Title("settings.take", "Take from stash", "AutoStashTake"), ImGuiTreeNodeFlags.DefaultOpen))
@@ -1477,7 +1488,8 @@ namespace AutoStash
             foreach (var group in cells.Where(c => c.Item != IntPtr.Zero).GroupBy(c => c.Item))
             {
                 var entry = new ItemEntry { Address = group.Key, Cells = group.ToList() };
-                if (PluginUiElementReflection.TryValidateItemAddress(group.Key, out var path, out _))
+                var path = string.Empty;
+                if (PluginUiElementReflection.TryValidateItemAddress(group.Key, out path, out _))
                 {
                     entry.Name = path;
                 }
@@ -1486,6 +1498,7 @@ namespace AutoStash
                 if (item?.TryGetComponent<Base>(out var b) == true)
                 {
                     entry.Name = b.BaseItemName ?? b.InternalName ?? entry.Name;
+                    entry.CorruptedWaystone = IsWaystone(path, b.InternalName) && this.IsCorrupted(b);
                 }
 
                 grid.Items.Add(entry);
@@ -1590,6 +1603,11 @@ namespace AutoStash
                 {
                     var origin = item.Cells.OrderBy(c => c.Row).ThenBy(c => c.Col).First();
                     if (disabled.Contains((origin.Row * InventoryCols) + origin.Col))
+                    {
+                        continue;
+                    }
+
+                    if (this.Settings.ExcludeCorruptedWaystones && item.CorruptedWaystone)
                     {
                         continue;
                     }
@@ -1927,7 +1945,30 @@ namespace AutoStash
             this.readUi = genericRead.MakeGenericMethod(typeof(UiElementBaseOffset));
             this.readWs = genericRead.MakeGenericMethod(typeof(StdWString));
             this.readU32 = genericRead.MakeGenericMethod(typeof(uint));
+            this.readByte = genericRead.MakeGenericMethod(typeof(byte));
             return true;
+        }
+
+        private static bool IsWaystone(string path, string? internalName)
+        {
+            if (path.Contains("Waystone", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("MapKey", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return !string.IsNullOrEmpty(internalName) &&
+                   internalName.Contains("Waystone", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsCorrupted(Base? baseComp)
+        {
+            if (baseComp == null || baseComp.Address == IntPtr.Zero || this.readByte == null)
+            {
+                return false;
+            }
+
+            return (this.ReadByte(baseComp.Address + BaseFlagsOffset) & CorruptedBit) != 0;
         }
 
         private uint ReadU32(IntPtr addr)
@@ -1940,6 +1981,23 @@ namespace AutoStash
             try
             {
                 return this.readU32.Invoke(this.handle, new object[] { addr }) is uint v ? v : 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private byte ReadByte(IntPtr addr)
+        {
+            if (this.readByte == null || addr == IntPtr.Zero)
+            {
+                return 0;
+            }
+
+            try
+            {
+                return this.readByte.Invoke(this.handle, new object[] { addr }) is byte v ? v : (byte)0;
             }
             catch
             {
