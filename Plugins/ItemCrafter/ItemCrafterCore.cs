@@ -1289,10 +1289,12 @@ namespace ItemCrafter
                     break;
                 case ActKind.Left:
                     Native.LeftClick();
+                    this.HideHighlight(act.Pos);
                     this.Log($"左键 → {this.Describe(act.Pos)}  Shift={(this.shiftDown ? "开" : "关")}");
                     break;
                 case ActKind.Right:
                     Native.RightClick();
+                    this.HideHighlight(act.Pos);
                     this.Log($"右键 → {this.Describe(act.Pos)}  Shift={(this.shiftDown ? "开" : "关")}");
                     break;
             }
@@ -1513,6 +1515,9 @@ namespace ItemCrafter
         private static bool Contains(Slot s, Vector2 p) =>
             p.X >= s.Pos.X && p.X <= s.Pos.X + s.Size.X &&
             p.Y >= s.Pos.Y && p.Y <= s.Pos.Y + s.Size.Y;
+
+        private void HideHighlight(Vector2 pos) =>
+            this.highlights.RemoveAll(s => Contains(s, pos));
 
         private void DrawHighlights()
         {
