@@ -241,7 +241,7 @@ namespace ItemCrafter
         {
             if (ids == null || ids.Count == 0)
             {
-                return false;
+                return true;
             }
 
             foreach (var id in ids)
@@ -278,7 +278,9 @@ namespace ItemCrafter
             (internalName.Equals(name, StringComparison.OrdinalIgnoreCase) ||
              displayName.Equals(name, StringComparison.OrdinalIgnoreCase) ||
              path.Equals(name, StringComparison.OrdinalIgnoreCase) ||
-             path.EndsWith("/" + name, StringComparison.OrdinalIgnoreCase));
+             path.EndsWith("/" + name, StringComparison.OrdinalIgnoreCase) ||
+             (!string.IsNullOrEmpty(displayName) &&
+              displayName.EndsWith(name, StringComparison.OrdinalIgnoreCase)));
 
         public static bool CanApply(CurrencyInfo info, string path)
         {
@@ -583,6 +585,8 @@ namespace ItemCrafter
                 MatchesConds(["TowerDroppedItemRarityIncrease3"], new CraftExpr { Mod = "TowerDropped" }, false) ||
                 MatchesConds(["Foo"], new CraftExpr { Mod = "Foo", Not = true }, false) ||
                 !MatchesConds(["Bar"], new CraftExpr { Mod = "Foo", Not = true }, false) ||
+                !MatchesAny(Array.Empty<string>(), "Metadata/Items/TowerAugment/GenericAugment", "GenericAugment", "Irradiated Tablet") ||
+                !MatchesTarget("GenericAugment", "Metadata/Items/TowerAugment/GenericAugment", "GenericAugment", "Collector's Irradiated Tablet") ||
                 !MatchesTarget("BreachAugment", "Metadata/Items/TowerAugment/BreachAugment", "BreachAugment", "Breach Tablet") ||
                 MatchesTarget("MapKeyTier15", "Metadata/Items/TowerAugment/BreachAugment", "BreachAugment", "Breach Tablet"))
             {

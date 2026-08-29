@@ -509,7 +509,7 @@ namespace ItemCrafter
             ImGui.SameLine();
             var open = ImGui.TreeNodeEx(
                 "##if",
-                ImGuiTreeNodeFlags.DefaultOpen | ImGuiTreeNodeFlags.Framed | ImGuiTreeNodeFlags.AllowOverlap,
+                ImGuiTreeNodeFlags.DefaultOpen | ImGuiTreeNodeFlags.AllowOverlap,
                 title);
             ImGui.SameLine();
             this.DrawJoin(ref block.When.All);
@@ -627,10 +627,16 @@ namespace ItemCrafter
 
         private void DrawModCombo(ref string id)
         {
+            var hint = this.PluginText.T("settings.mod_hint", "含词缀");
+            var text = string.IsNullOrEmpty(id) ? string.Empty : this.ModPreview(id);
             ImGui.SetNextItemWidth(216);
-            ImGui.InputTextWithHint("##modText", this.PluginText.T("settings.mod_hint", "含词缀"), ref id, 128);
+            if (ImGui.InputTextWithHint("##modText", hint, ref text, 128))
+            {
+                id = text.Trim();
+            }
 
             ImGui.SameLine(0, 4);
+            ImGui.SetNextItemWidth(ImGui.GetFrameHeight());
             if (!ImGui.BeginCombo("##modPick", string.Empty, ImGuiComboFlags.NoPreview | ImGuiComboFlags.HeightLarge))
             {
                 return;
@@ -642,14 +648,8 @@ namespace ItemCrafter
                 ImGui.SetKeyboardFocusHere();
             }
 
-            ImGui.SetNextItemWidth(-1);
-            ImGui.InputTextWithHint("##filter", this.PluginText.T("settings.mod_hint", "含词缀"), ref this.modComboFilter, 128);
-            if (!string.IsNullOrWhiteSpace(this.modComboFilter) &&
-                ImGui.Selectable(this.modComboFilter + "##typed"))
-            {
-                id = this.modComboFilter.Trim();
-            }
-
+            ImGui.SetNextItemWidth(240f);
+            ImGui.InputTextWithHint("##filter", hint, ref this.modComboFilter, 128);
             foreach (var mod in Catalog.FilterMods(this.modComboFilter))
             {
                 var selected = mod.Id.Equals(id, StringComparison.OrdinalIgnoreCase);
@@ -1728,19 +1728,30 @@ namespace ItemCrafter
             }
 
             var page = this.VisibleFragmentPage(active);
-            if (active == this.stashCacheKey && page == this.stashCachePage)
+            if (!this.running &&
+                active == this.stashCacheKey &&
+                page == this.stashCachePage &&
+                this.stashCache.Count > 0)
             {
                 this.FillFromCache(this.stashCache, this.stashSlots);
-                this.stashKind = this.stashCacheKind;
-                return;
+                if (this.stashSlots.Count > 0)
+                {
+                    this.stashKind = this.stashCacheKind;
+                    return;
+                }
             }
 
-            if (this.stashCacheKey != IntPtr.Zero)
+            if (this.stashCacheKey != IntPtr.Zero && this.stashCacheKey != active)
             {
                 this.ClearPicked();
             }
 
             this.ProcessStashTabs(tabs);
+            if (this.stashSlots.Count == 0)
+            {
+                return;
+            }
+
             this.stashCacheKey = active;
             this.stashCachePage = page;
             this.stashCacheKind = this.stashKind;
@@ -1775,10 +1786,13 @@ namespace ItemCrafter
                 return;
             }
 
-            if (grid == this.invCacheKey && this.invCache.Count > 0)
+            if (!this.running && grid == this.invCacheKey && this.invCache.Count > 0)
             {
                 this.FillFromCache(this.invCache, this.invSlots);
-                return;
+                if (this.invSlots.Count > 0)
+                {
+                    return;
+                }
             }
 
             this.ProcessGrid(grid, this.invSlots);
@@ -1856,9 +1870,12 @@ namespace ItemCrafter
                 var kids = this.ReadVec(this.ReadUi(waystoneRoot).ChildrensPtr);
                 if (kids.Length == 16)
                 {
-                    this.stashKind = "waystone";
                     this.ProcessWaystoneTab(kids);
-                    return;
+                    if (this.stashSlots.Count > 0)
+                    {
+                        this.stashKind = "waystone";
+                        return;
+                    }
                 }
             }
 
