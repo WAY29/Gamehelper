@@ -840,7 +840,8 @@ namespace AutoStash
 
             this.storeCandidates = this.BuildTargets(ActionKind.Store, false).Count;
             this.takeCandidates = this.BuildTargets(ActionKind.Take, false).Count;
-            this.scanStatus = $"inv={this.inventoryGrid?.Items.Count ?? 0} stash={this.stashGrids.Sum(g => g.Items.Count)}";
+            var kind = this.stashGrids.Count == 0 ? string.Empty : " " + string.Join(",", this.stashGrids.Select(g => g.Name).Distinct());
+            this.scanStatus = $"inv={this.inventoryGrid?.Items.Count ?? 0} stash={this.stashGrids.Sum(g => g.Items.Count)}{kind}";
         }
 
         private bool TryResolveStashFrame(IntPtr leftPanel, out Vector2 pos, out Vector2 size)
@@ -1320,68 +1321,74 @@ namespace AutoStash
 
         private void CollectStash(IntPtr tab)
         {
-            var normal = this.ResolvePath(tab, new[] { 0, 0 });
-            if (this.HasGrid(normal))
-            {
-                var grid = this.BuildGrid("stash", normal, false);
-                if (grid != null)
-                {
-                    this.stashGrids.Add(grid);
-                }
-
-                return;
-            }
-
             var waystones = this.ResolvePath(tab, new[] { 0, 1 });
             if (waystones != IntPtr.Zero)
             {
                 var tiers = this.ReadVec(this.ReadUi(waystones).ChildrensPtr);
                 if (tiers.Length == 16)
                 {
-                    foreach (var tier in tiers)
+                    this.CollectWaystoneTab(tiers);
+                    if (this.stashGrids.Count > 0)
                     {
-                        if (tier == IntPtr.Zero || !this.IsVisible(tier))
-                        {
-                            continue;
-                        }
-
-                        var kids = this.ReadVec(this.ReadUi(tier).ChildrensPtr);
-                        if (kids.Length == 0 || kids[0] == IntPtr.Zero)
-                        {
-                            continue;
-                        }
-
-                        var c0 = this.ReadVec(this.ReadUi(kids[0]).ChildrensPtr);
-                        if (c0.Length <= 1 || c0[1] == IntPtr.Zero)
-                        {
-                            continue;
-                        }
-
-                        foreach (var page in this.ReadVec(this.ReadUi(c0[1]).ChildrensPtr))
-                        {
-                            if (page == IntPtr.Zero || !this.IsVisible(page))
-                            {
-                                continue;
-                            }
-
-                            var pageKids = this.ReadVec(this.ReadUi(page).ChildrensPtr);
-                            if (pageKids.Length == 0)
-                            {
-                                continue;
-                            }
-
-                            var grid = this.BuildGrid("waystone", pageKids[0], false);
-                            if (grid != null)
-                            {
-                                this.stashGrids.Add(grid);
-                            }
-                        }
+                        return;
                     }
-
-                    return;
                 }
             }
 
+            if (this.TryAddStashGrid("stash", this.ResolvePath(tab, new[] { 0, 0 })) ||
+                this.TryAddStashGrid("flat", this.ResolvePath(tab, new[] { 0 })))
+            {
+                return;
+            }
+
+            this.CollectFragmentTab(tab);
+            if (this.stashGrids.Count == 0)
+            {
+                this.CollectWells(tab);
+            }
+        }
+
+        private void CollectWaystoneTab(IntPtr[] tiers)
+        {
+            foreach (var tier in tiers)
+            {
+                if (tier == IntPtr.Zero || !this.IsVisible(tier))
+                {
+                    continue;
+                }
+
+                var kids = this.ReadVec(this.ReadUi(tier).ChildrensPtr);
+                if (kids.Length == 0 || kids[0] == IntPtr.Zero)
+                {
+                    continue;
+                }
+
+                var c0 = this.ReadVec(this.ReadUi(kids[0]).ChildrensPtr);
+                if (c0.Length <= 1 || c0[1] == IntPtr.Zero)
+                {
+                    continue;
+                }
+
+                foreach (var page in this.ReadVec(this.ReadUi(c0[1]).ChildrensPtr))
+                {
+                    if (page == IntPtr.Zero || !this.IsVisible(page))
+                    {
+                        continue;
+                    }
+
+                    var pageKids = this.ReadVec(this.ReadUi(page).ChildrensPtr);
+                    if (pageKids.Length == 0 || pageKids[0] == IntPtr.Zero)
+                    {
+                        continue;
+                    }
+
+                    this.TryAddStashGrid("waystone", pageKids[0]);
+                }
+            }
+        }
+
+        private void CollectFragmentTab(IntPtr tab)
+        {
             var fragments = this.ResolvePath(tab, new[] { 0, 0, 0, 1 });
             if (fragments == IntPtr.Zero)
             {
@@ -1401,18 +1408,25 @@ namespace AutoStash
                     continue;
                 }
 
-                var slots = this.ResolvePath(page, new[] { 0, 0 });
-                if (!this.HasGrid(slots))
-                {
-                    continue;
-                }
-
-                var grid = this.BuildGrid("fragment", slots, false);
-                if (grid != null)
-                {
-                    this.stashGrids.Add(grid);
-                }
+                this.TryAddStashGrid("fragment", this.ResolvePath(page, new[] { 0, 0 }));
             }
+        }
+
+        private bool TryAddStashGrid(string name, IntPtr root)
+        {
+            if (!this.HasGrid(root))
+            {
+                return false;
+            }
+
+            var grid = this.BuildGrid(name, root, false);
+            if (grid == null || grid.Items.Count == 0)
+            {
+                return false;
+            }
+
+            this.stashGrids.Add(grid);
+            return true;
         }
 
         private bool HasGrid(IntPtr root)
@@ -1445,7 +1459,7 @@ namespace AutoStash
                 cells.Add(new Cell
                 {
                     Slot = slot,
-                    Item = this.ItemPtr(slot),
+                    Item = this.FindItemPtr(slot, 2),
                     Pos = pos,
                     Size = size,
                 });
@@ -1485,7 +1499,13 @@ namespace AutoStash
                 CellH = cells.Min(c => c.Size.Y),
                 Cells = cells,
             };
-            foreach (var group in cells.Where(c => c.Item != IntPtr.Zero).GroupBy(c => c.Item))
+            this.AttachItems(grid);
+            return grid;
+        }
+
+        private void AttachItems(Grid grid)
+        {
+            foreach (var group in grid.Cells.Where(c => c.Item != IntPtr.Zero).GroupBy(c => c.Item))
             {
                 var entry = new ItemEntry { Address = group.Key, Cells = group.ToList() };
                 var path = string.Empty;
@@ -1503,8 +1523,137 @@ namespace AutoStash
 
                 grid.Items.Add(entry);
             }
+        }
 
-            return grid;
+        private void CollectWells(IntPtr panel)
+        {
+            if (panel == IntPtr.Zero ||
+                !PluginUiElementReflection.TryGetAbsoluteRect(panel, out var clipPos, out var clipSize) ||
+                clipSize.X < 200f || clipSize.Y < 200f)
+            {
+                return;
+            }
+
+            var cells = new List<Cell>();
+            this.WalkWellGroups(panel, cells, 0, clipPos, clipSize);
+            this.WalkIsolatedWells(panel, cells, 0, clipPos, clipSize);
+            if (cells.Count == 0)
+            {
+                return;
+            }
+
+            this.AssignClustered(cells);
+            var grid = new Grid
+            {
+                Name = "wells",
+                Pos = new Vector2(cells.Min(c => c.Pos.X), cells.Min(c => c.Pos.Y)),
+                Size = new Vector2(
+                    cells.Max(c => c.Pos.X + c.Size.X) - cells.Min(c => c.Pos.X),
+                    cells.Max(c => c.Pos.Y + c.Size.Y) - cells.Min(c => c.Pos.Y)),
+                Rows = cells.Max(c => c.Row) + 1,
+                Cols = cells.Max(c => c.Col) + 1,
+                CellW = cells.Min(c => c.Size.X),
+                CellH = cells.Min(c => c.Size.Y),
+                Cells = cells,
+            };
+            this.AttachItems(grid);
+            if (grid.Items.Count > 0)
+            {
+                this.stashGrids.Add(grid);
+            }
+        }
+
+        private void WalkWellGroups(IntPtr el, List<Cell> dest, int depth, Vector2 clipPos, Vector2 clipSize)
+        {
+            if (el == IntPtr.Zero || depth > 10 || !this.IsVisible(el))
+            {
+                return;
+            }
+
+            var kids = this.ReadVec(this.ReadUi(el).ChildrensPtr);
+            var wells = 0;
+            foreach (var kid in kids)
+            {
+                if (this.IsWellInClip(kid, clipPos, clipSize))
+                {
+                    wells++;
+                }
+            }
+
+            if (wells >= 2)
+            {
+                foreach (var kid in kids)
+                {
+                    this.TryAddWellCell(kid, dest, clipPos, clipSize);
+                }
+            }
+
+            foreach (var kid in kids)
+            {
+                this.WalkWellGroups(kid, dest, depth + 1, clipPos, clipSize);
+            }
+        }
+
+        private void WalkIsolatedWells(IntPtr el, List<Cell> dest, int depth, Vector2 clipPos, Vector2 clipSize)
+        {
+            if (el == IntPtr.Zero || depth > 10 || !this.IsVisible(el))
+            {
+                return;
+            }
+
+            this.TryAddWellCell(el, dest, clipPos, clipSize);
+            foreach (var kid in this.ReadVec(this.ReadUi(el).ChildrensPtr))
+            {
+                this.WalkIsolatedWells(kid, dest, depth + 1, clipPos, clipSize);
+            }
+        }
+
+        private bool IsWellInClip(IntPtr el, Vector2 clipPos, Vector2 clipSize)
+        {
+            return this.IsVisible(el) &&
+                   PluginUiElementReflection.TryGetAbsoluteRect(el, out var pos, out var size) &&
+                   size.X >= 32f && size.Y >= 32f && size.X <= 220f && size.Y <= 420f &&
+                   pos.X + (size.X * 0.5f) >= clipPos.X &&
+                   pos.Y + (size.Y * 0.5f) >= clipPos.Y &&
+                   pos.X + (size.X * 0.5f) <= clipPos.X + clipSize.X &&
+                   pos.Y + (size.Y * 0.5f) <= clipPos.Y + clipSize.Y;
+        }
+
+        private bool TryAddWellCell(IntPtr el, List<Cell> dest, Vector2 clipPos, Vector2 clipSize)
+        {
+            if (!this.IsWellInClip(el, clipPos, clipSize))
+            {
+                return false;
+            }
+
+            PluginUiElementReflection.TryGetAbsoluteRect(el, out var pos, out var size);
+            var item = this.FindItemPtr(el, 2);
+            if (item == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            var area = size.X * size.Y;
+            for (var i = 0; i < dest.Count; i++)
+            {
+                if (dest[i].Slot == el)
+                {
+                    return false;
+                }
+
+                if (dest[i].Item == item)
+                {
+                    if (area > dest[i].Size.X * dest[i].Size.Y)
+                    {
+                        dest[i] = new Cell { Slot = el, Item = item, Pos = pos, Size = size };
+                    }
+
+                    return true;
+                }
+            }
+
+            dest.Add(new Cell { Slot = el, Item = item, Pos = pos, Size = size });
+            return true;
         }
 
         private void AssignFixed(List<Cell> cells, int cols, int rows, Vector2 pos, Vector2 size)
@@ -2040,6 +2189,31 @@ namespace AutoStash
         {
             var p = this.ReadPtr(el + ItemPtrHint);
             return PluginUiElementReflection.TryValidateItemAddress(p, out _, out _) ? p : IntPtr.Zero;
+        }
+
+        private IntPtr FindItemPtr(IntPtr el, int depth)
+        {
+            var item = this.ItemPtr(el);
+            if (item != IntPtr.Zero)
+            {
+                return item;
+            }
+
+            if (depth <= 0)
+            {
+                return IntPtr.Zero;
+            }
+
+            foreach (var kid in this.ReadVec(this.ReadUi(el).ChildrensPtr))
+            {
+                item = this.FindItemPtr(kid, depth - 1);
+                if (item != IntPtr.Zero)
+                {
+                    return item;
+                }
+            }
+
+            return IntPtr.Zero;
         }
 
         private IntPtr ResolvePath(IntPtr root, int[] path)
