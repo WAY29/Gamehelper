@@ -15,6 +15,7 @@ namespace GameHelper.Data
         public string English { get; set; } = string.Empty;
         public string ZhCn { get; set; } = string.Empty;
         public string ZhTw { get; set; } = string.Empty;
+        public string Art { get; set; } = string.Empty;
     }
 
     public sealed class CatalogMod
@@ -257,11 +258,13 @@ namespace GameHelper.Data
                 byte[] itemsDat;
                 byte[] modsDat;
                 byte[] areasDat;
+                byte[] artDat;
                 using (var ggpk = new BundledGGPK(path, parsePathsInIndex: false))
                 {
                     itemsDat = ReadDat(ggpk, "Data/Balance/BaseItemTypes.datc64");
                     modsDat = ReadDat(ggpk, "Data/Balance/Mods.datc64");
                     areasDat = ReadDat(ggpk, "Data/Balance/WorldAreas.datc64");
+                    artDat = ReadDat(ggpk, "Data/Balance/ItemVisualIdentity.datc64");
                 }
 
                 var items = Datc64Strings.ParseBaseItems(itemsDat);
@@ -269,6 +272,8 @@ namespace GameHelper.Data
                 {
                     throw new InvalidOperationException("BaseItemTypes had no Metadata/Items paths");
                 }
+
+                Datc64Strings.ApplyArt(items, itemsDat, artDat);
 
                 Dictionary<string, CatalogItem> previousItems;
                 Dictionary<string, CatalogMod> previousMods;
@@ -448,10 +453,30 @@ namespace GameHelper.Data
         {
             lock (Gate)
             {
-                lastError = ex.Message;
+                lastError = MissingOo2Core(ex) ? "oo2core" : ex.Message;
             }
 
             Console.WriteLine($"[ItemCatalog] {ex}");
+        }
+
+        private static bool MissingOo2Core(Exception ex)
+        {
+            for (var e = ex; e != null; e = e.InnerException)
+            {
+                if (e is DllNotFoundException or EntryPointNotFoundException)
+                {
+                    return true;
+                }
+
+                if (e is FileNotFoundException &&
+                    (e.Message.Contains("oo2core", StringComparison.OrdinalIgnoreCase) ||
+                     ((FileNotFoundException)e).FileName?.Contains("oo2core", StringComparison.OrdinalIgnoreCase) == true))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static byte[] ReadDat(BundledGGPK ggpk, string ggpkPath)
@@ -528,6 +553,7 @@ namespace GameHelper.Data
                 }
 
                 byArea = nextAreas;
+                lastError = string.Empty;
                 extractedUtc = snapshot.ExtractedUtc;
                 namesUtc = snapshot.NamesUtc;
                 ggpkWriteUtc = snapshot.GgpkWriteUtc;

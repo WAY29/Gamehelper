@@ -577,7 +577,14 @@ namespace GameHelper.Settings
 
             if (!string.IsNullOrEmpty(ItemCatalog.LastError))
             {
-                ImGui.TextColored(new Vector4(0.95f, 0.45f, 0.35f, 1f), ItemCatalog.LastError);
+                var error = ItemCatalog.LastError == "oo2core"
+                    ? L.T(
+                        "settings.datasources.catalog.error.oo2core",
+                        "Extract failed: copy oo2core.dll next to GameHelper.exe. Get it from VisualGGPK3.")
+                    : ItemCatalog.LastError;
+                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.95f, 0.45f, 0.35f, 1f));
+                ImGui.TextWrapped(error);
+                ImGui.PopStyleColor();
             }
 
             ImGui.TextWrapped(L.T(

@@ -162,6 +162,127 @@ namespace GameHelper.Data
             return hasLower;
         }
 
+        public static void ApplyArt(List<CatalogItem> items, ReadOnlySpan<byte> baseItems, ReadOnlySpan<byte> visuals)
+        {
+            if (!TryDatHeader(baseItems, out var bitCount, out var bitRow, out var bitBb) ||
+                !TryDatHeader(visuals, out var iviCount, out var iviRow, out var iviBb) ||
+                bitRow < 0x80 ||
+                iviRow < 0x10)
+            {
+                return;
+            }
+
+            var art = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < bitCount; i++)
+            {
+                var row = 4 + (i * bitRow);
+                var path = ReadDatString(baseItems, bitBb, row);
+                if (!path.StartsWith("Metadata/Items/", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var fk = BitConverter.ToInt32(baseItems.Slice(row + 0x7C, 4));
+                if ((uint)fk >= (uint)iviCount)
+                {
+                    continue;
+                }
+
+                var dds = ReadDatString(visuals, iviBb, 4 + (fk * iviRow) + 8);
+                var slash = dds.LastIndexOf('/');
+                var file = slash >= 0 ? dds[(slash + 1)..] : dds;
+                if (file.EndsWith(".dds", StringComparison.OrdinalIgnoreCase))
+                {
+                    file = file[..^4];
+                }
+
+                if (file.Length == 0)
+                {
+                    continue;
+                }
+
+                var nameSlash = path.LastIndexOf('/');
+                var internalName = nameSlash >= 0 ? path[(nameSlash + 1)..] : path;
+                art[internalName] = file;
+            }
+
+            if (!art.TryGetValue("CurrencyRerollRare", out var chaosArt) ||
+                chaosArt != "CurrencyRerollRare")
+            {
+                return;
+            }
+
+            foreach (var item in items)
+            {
+                if (art.TryGetValue(item.InternalName, out var id))
+                {
+                    item.Art = id;
+                }
+            }
+        }
+
+        private static bool TryDatHeader(ReadOnlySpan<byte> data, out int count, out int rowSize, out int bb)
+        {
+            count = 0;
+            rowSize = 0;
+            bb = -1;
+            if (data.Length < 16)
+            {
+                return false;
+            }
+
+            count = BitConverter.ToInt32(data[..4]);
+            if (count <= 0 || count > 200_000)
+            {
+                return false;
+            }
+
+            ReadOnlySpan<byte> magic = [0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB];
+            bb = data.IndexOf(magic);
+            if (bb < 4 || (bb - 4) % count != 0)
+            {
+                return false;
+            }
+
+            rowSize = (bb - 4) / count;
+            return rowSize >= 8;
+        }
+
+        private static string ReadDatString(ReadOnlySpan<byte> data, int bb, int fieldOffset)
+        {
+            if (fieldOffset < 0 || fieldOffset + 4 > data.Length)
+            {
+                return string.Empty;
+            }
+
+            var rel = BitConverter.ToInt32(data.Slice(fieldOffset, 4));
+            var abs = bb + rel;
+            if (rel <= 0 || abs < 0 || abs + 1 >= data.Length)
+            {
+                return string.Empty;
+            }
+
+            var sb = new StringBuilder();
+            var i = abs;
+            while (i + 1 < data.Length)
+            {
+                var c = (char)(data[i] | (data[i + 1] << 8));
+                i += 2;
+                if (c == 0)
+                {
+                    break;
+                }
+
+                sb.Append(c);
+                if (sb.Length > 180)
+                {
+                    break;
+                }
+            }
+
+            return sb.ToString();
+        }
+
         private static void SelfCheck()
         {
             static byte[] Utf16(params string[] parts)

@@ -38,6 +38,7 @@
   "settings.datasources.catalog.ggpk_status": "{0} items, {1} mods | {2} | GGPK {3:yyyy-MM-dd}",
   "settings.datasources.catalog.names_status": "{0} named | {1}",
   "settings.datasources.catalog.stale": "Content.ggpk is newer than this catalog. Extract again.",
+  "settings.datasources.catalog.error.oo2core": "Extract failed: copy oo2core.dll next to GameHelper.exe. Get it from VisualGGPK3.",
   "settings.datasources.catalog.help": "Needs oo2core.dll next to GameHelper.exe.",
   "settings.datasources.ago.just_now": "just now",
   "settings.datasources.ago.minutes": "{0} min ago",

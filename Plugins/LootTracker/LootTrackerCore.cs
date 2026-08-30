@@ -128,6 +128,11 @@ namespace LootTracker
         private string PriceKey(string path)
         {
             var seg = LastSegment(path);
+            if (TryCatalogArt(seg, out var catalogArt))
+            {
+                return catalogArt;
+            }
+
             if (this.metaToArt.TryGetValue(seg, out var art))
             {
                 return art;
@@ -138,6 +143,11 @@ namespace LootTracker
             if (s > 0 && s < seg.Length)
             {
                 var stem = seg[..s];
+                if (TryCatalogArt(stem, out var catalogStem))
+                {
+                    return catalogStem + seg[s..];
+                }
+
                 if (this.metaToArt.TryGetValue(stem, out var stemArt))
                 {
                     return stemArt + seg[s..];
@@ -145,6 +155,18 @@ namespace LootTracker
             }
 
             return seg;
+        }
+
+        private static bool TryCatalogArt(string internalName, out string art)
+        {
+            art = string.Empty;
+            if (!ItemCatalog.TryGet(internalName, out var item) || item == null || string.IsNullOrEmpty(item.Art))
+            {
+                return false;
+            }
+
+            art = item.Art;
+            return true;
         }
 
         // Inventory-aggregation keys are "<rarity-digit><metadata-path>" (see BuildItemKey), so

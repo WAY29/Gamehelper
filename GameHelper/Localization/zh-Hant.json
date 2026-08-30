@@ -38,6 +38,7 @@
   "settings.datasources.catalog.ggpk_status": "{0} 物品, {1} 詞綴 | {2} | GGPK {3:yyyy-MM-dd}",
   "settings.datasources.catalog.names_status": "{0} 條已翻譯 | {1}",
   "settings.datasources.catalog.stale": "Content.ggpk 比目前目錄新，請重新提取。",
+  "settings.datasources.catalog.error.oo2core": "提取失敗：請把 oo2core.dll 放到 GameHelper.exe 旁邊。建議從 VisualGGPK3 拷取",
   "settings.datasources.catalog.help": "GameHelper.exe 旁邊需要 oo2core.dll。",
   "settings.datasources.ago.just_now": "剛剛",
   "settings.datasources.ago.minutes": "{0} 分鐘前",
