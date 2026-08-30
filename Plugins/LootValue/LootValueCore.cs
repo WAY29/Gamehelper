@@ -13,6 +13,7 @@ namespace LootValue
     using System.Reflection;
     using System.Text.RegularExpressions;
     using GameHelper;
+    using GameHelper.Data;
     using GameHelper.Plugin;
     using GameHelper.RemoteEnums;
     using GameHelper.RemoteObjects.Components;
@@ -94,9 +95,6 @@ namespace LootValue
             {
                 this.SaveSettings();
             }
-
-            PoeNinjaPriceFetcher.Configure(this.Settings.PriceSource, this.Settings.League ?? string.Empty, this.Settings.RefreshIntervalMin);
-            PoeNinjaPriceFetcher.Initialize(this.DllDirectory);
         }
 
         private bool TryMigrateStashValueSettings()
@@ -216,42 +214,12 @@ namespace LootValue
 
             ImGui.ColorEdit4(this.PluginText.Label("settings.text_color", "Text color", "LootValueTextColor"), ref this.Settings.TextColor);
             ImGui.ColorEdit4(this.PluginText.Label("settings.highlight_color", "Highlight color", "LootValueHighlightColor"), ref this.Settings.HighlightColor);
-
-            ImGui.Separator();
-            ImGui.Text(this.PluginText.T("section.price_source", "Price source"));
-            if (ImGui.RadioButton("poe2scout", this.Settings.PriceSource == PoeNinjaPriceFetcher.SourcePoe2Scout))
-                this.Settings.PriceSource = PoeNinjaPriceFetcher.SourcePoe2Scout;
-            ImGui.SameLine();
-            if (ImGui.RadioButton("poe.ninja", this.Settings.PriceSource == PoeNinjaPriceFetcher.SourcePoeNinja))
-                this.Settings.PriceSource = PoeNinjaPriceFetcher.SourcePoeNinja;
-
-            ImGui.InputText(this.PluginText.Label("settings.league", "League", "LootValueLeague"), ref this.Settings.League, 64);
-            ImGui.SliderInt(this.PluginText.Label("settings.refresh_interval", "Refresh interval (min)", "LootValueRefreshInterval"), ref this.Settings.RefreshIntervalMin, 1, 120);
-            if (ImGui.Button(this.PluginText.Label("button.refresh_prices_now", "Refresh prices now", "LootValueRefreshPricesNow")))
-            {
-                PoeNinjaPriceFetcher.Configure(this.Settings.PriceSource, this.Settings.League ?? string.Empty, this.Settings.RefreshIntervalMin);
-                PoeNinjaPriceFetcher.ForceRefresh(this.DllDirectory, ignoreCooldown: true);
-            }
-
-            ImGui.SameLine();
-            if (PoeNinjaPriceFetcher.IsFetching)
-            {
-                ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.2f, 1f), this.PluginText.T("status.loading", "Loading..."));
-            }
-            else if (PoeNinjaPriceFetcher.LastFetchUtc > DateTime.MinValue)
-            {
-                var mins = Math.Max(0, (int)(DateTime.UtcNow - PoeNinjaPriceFetcher.LastFetchUtc).TotalMinutes);
-                ImGui.TextColored(new Vector4(0.5f, 0.8f, 0.5f, 1f), this.PluginText.F("status.loaded_items", "{0} items | {1} min ago", PoeNinjaPriceFetcher.LoadedItemCount, mins));
-            }
         }
 
         /// <inheritdoc/>
         public override void DrawUI()
         {
             if (Core.States.GameCurrentState != GameStateTypes.InGameState) return;
-
-            PoeNinjaPriceFetcher.Configure(this.Settings.PriceSource, this.Settings.League ?? string.Empty, this.Settings.RefreshIntervalMin);
-            PoeNinjaPriceFetcher.RefreshIfNeeded();
 
             if (this.Settings.DiagnosticsMode)
             {
@@ -498,11 +466,11 @@ namespace LootValue
             if (!this.groundTagUnitChaos.TryGetValue(name, out var unitChaos) || unitChaos <= 0) return false;
             this.matchedLootTagNames.Add(name);
 
-            var priced = new PoeNinjaPrice { PriceChaos = unitChaos * count };
-            var (exVal, _) = PoeNinjaPriceFetcher.GetDisplayPrice(priced, 1);
+            var priced = new MarketPrice { PriceChaos = unitChaos * count };
+            var (exVal, _) = MarketPrices.GetDisplayPrice(priced, 1);
             if (exVal < this.Settings.MinValueEx) return false;
 
-            var (disp, cur) = PoeNinjaPriceFetcher.GetDisplayPrice(priced, this.Settings.DisplayCurrency);
+            var (disp, cur) = MarketPrices.GetDisplayPrice(priced, this.Settings.DisplayCurrency);
             chipText = FormatValue(disp, cur);
             highlight = exVal >= this.Settings.HighlightMinEx;
             color = ImGui.ColorConvertFloat4ToU32(highlight ? this.Settings.HighlightColor : this.Settings.TextColor);
@@ -786,17 +754,17 @@ namespace LootValue
                 if (string.Equals(lookup, itemName, StringComparison.OrdinalIgnoreCase) ||
                     !this.pricedDisplayNames.TryGetValue(lookup, out unitChaos) || unitChaos <= 0)
                 {
-                    var price = PoeNinjaPriceFetcher.GetPrice(lookup);
+                    var price = MarketPrices.GetPrice(lookup);
                     if (price == null) return false;
                     unitChaos = price.PriceChaos;
                 }
             }
 
-            var priced = new PoeNinjaPrice { PriceChaos = unitChaos * amount };
-            var (exValue, _) = PoeNinjaPriceFetcher.GetDisplayPrice(priced, 1);
+            var priced = new MarketPrice { PriceChaos = unitChaos * amount };
+            var (exValue, _) = MarketPrices.GetDisplayPrice(priced, 1);
             if (exValue < this.Settings.MinValueEx) return false;
 
-            var (displayValue, displayCurrency) = PoeNinjaPriceFetcher.GetDisplayPrice(priced, this.Settings.DisplayCurrency);
+            var (displayValue, displayCurrency) = MarketPrices.GetDisplayPrice(priced, this.Settings.DisplayCurrency);
             text = FormatValue(displayValue, displayCurrency);
             highlight = exValue >= this.Settings.HighlightMinEx;
             color = ImGui.ColorConvertFloat4ToU32(highlight ? this.Settings.HighlightColor : this.Settings.TextColor);
@@ -1263,7 +1231,7 @@ namespace LootValue
                 $"WorldItem path={wiPath}    Metadata/Items path={metaItemsPath}\n" +
                 $"WorldItem component={wiComp}    inner item OK={innerOk}\n" +
                 $"priced={priced}    belowFloor(<{this.Settings.MinValueEx}ex)={belowFloor}    wouldDraw={priced - belowFloor}\n" +
-                $"priceDB={PoeNinjaPriceFetcher.LoadedItemCount}  fetching={PoeNinjaPriceFetcher.IsFetching}\n" +
+                $"priceDB={MarketPrices.LoadedItemCount}  fetching={MarketPrices.IsFetching}\n" +
                 this.FormatHoveredDiag();
         }
 
@@ -1315,7 +1283,7 @@ namespace LootValue
 
         /// <summary>Unit chaos price + names. Uniques resolve by icon art; everything else by base
         /// name + metadata path (so localized BaseItemName still prices against the English DB).</summary>
-        private bool TryGetItemUnitPrice(Item item, out PoeNinjaPrice price, out string resolvedName, out string baseName)
+        private bool TryGetItemUnitPrice(Item item, out MarketPrice price, out string resolvedName, out string baseName)
         {
             price = null!;
             resolvedName = string.Empty;
@@ -1343,14 +1311,14 @@ namespace LootValue
             {
                 foreach (var key in ArtKeyVariants(artBasename))
                 {
-                    if (PoeNinjaPriceFetcher.TryResolveDisplayName(key, out var uniqueName) &&
-                        !PoeNinjaPriceFetcher.IsGenericLookupName(uniqueName))
+                    if (MarketPrices.TryResolveDisplayName(key, out var uniqueName) &&
+                        !MarketPrices.IsGenericLookupName(uniqueName))
                     {
                         resolvedName = uniqueName;
                         break;
                     }
 
-                    if (PoeNinjaPriceFetcher.HasPriceDataForName(key))
+                    if (MarketPrices.HasPriceDataForName(key))
                     {
                         resolvedName = key;
                         break;
@@ -1364,7 +1332,7 @@ namespace LootValue
                 resolvedName = internalName;
             resolvedName = ItemLocalization.ResolveEnglish(resolvedName);
 
-            var found = PoeNinjaPriceFetcher.GetPrice(
+            var found = MarketPrices.GetPrice(
                 resolvedName,
                 ItemModHelper.GetModLines(item),
                 internalName,
@@ -1373,8 +1341,8 @@ namespace LootValue
             if (found == null) return false;
             price = found;
 
-            if (PoeNinjaPriceFetcher.TryResolveDisplayName(datId, out var mapped) ||
-                PoeNinjaPriceFetcher.TryResolveDisplayName(internalName, out mapped))
+            if (MarketPrices.TryResolveDisplayName(datId, out var mapped) ||
+                MarketPrices.TryResolveDisplayName(internalName, out mapped))
                 resolvedName = mapped;
 
             foreach (var n in ItemLocalization.NamesFor(resolvedName, baseName))
@@ -1399,11 +1367,11 @@ namespace LootValue
             var stack = item.TryGetComponent<Stack>(out var stackComp) && stackComp.Count > 1 ? stackComp.Count : 1;
             var priceChaos = price.PriceChaos * stack;
 
-            var priced = new PoeNinjaPrice { PriceChaos = priceChaos };
-            var (displayValue, displayCurrency) = PoeNinjaPriceFetcher.GetDisplayPrice(priced, this.Settings.DisplayCurrency);
+            var priced = new MarketPrice { PriceChaos = priceChaos };
+            var (displayValue, displayCurrency) = MarketPrices.GetDisplayPrice(priced, this.Settings.DisplayCurrency);
 
             // Value floor / highlight compare in Exalted, independent of the chosen display currency.
-            var (exValue, _) = PoeNinjaPriceFetcher.GetDisplayPrice(priced, 1);
+            var (exValue, _) = MarketPrices.GetDisplayPrice(priced, 1);
             valueEx = exValue;
 
             var valueText = FormatValue(displayValue, displayCurrency);

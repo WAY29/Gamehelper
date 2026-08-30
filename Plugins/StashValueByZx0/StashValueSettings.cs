@@ -27,15 +27,6 @@ namespace StashValue
         /// <summary>Hide pricing overlays when hovering over the item slot.</summary>
         public bool HidePriceOnHover = true;
 
-        /// <summary>Price source: PoeNinja or Poe2Scout.</summary>
-        public int PriceSource = 1; // Default to Poe2Scout
-
-        /// <summary>PoE2 league name for price lookups.</summary>
-        public string League = "Runes of Aldur";
-
-        /// <summary>Automatic price refresh interval in minutes.</summary>
-        public int RefreshIntervalMin = 5;
-
         /// <summary>Display currency: 0 = Divine, 1 = Exalted, 2 = Chaos.</summary>
         public int DisplayCurrency = 1;
 

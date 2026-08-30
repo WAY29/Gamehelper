@@ -3,6 +3,7 @@ namespace LootTracker
     using System;
     using System.Collections.Generic;
     using System.Numerics;
+    using GameHelper.Data;
     using ImGuiNET;
 
     // ── Pickup toasts ────────────────────────────────────────────────────────────────────────────
@@ -172,7 +173,7 @@ namespace LootTracker
 
             ImGui.SetWindowFontScale(s);
 
-            var rate = this.priceCache.DivineToExaltedRate;
+            var rate = MarketPrices.DivineToExaltedRate;
             bool divineOnly = this.DivineOnly;
 
             // Oldest on top; newest at the bottom (closest to the strip). Bottom-pivot auto-resize grows

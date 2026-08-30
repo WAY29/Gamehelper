@@ -14,6 +14,7 @@ namespace StashValue
     using System.Reflection;
     using System.Text.RegularExpressions;
     using GameHelper;
+    using GameHelper.Data;
     using GameHelper.Plugin;
     using GameHelper.RemoteEnums;
     using GameHelper.RemoteObjects.Components;
@@ -55,8 +56,6 @@ namespace StashValue
                 }
             }
 
-            PoeNinjaPriceFetcher.Configure(this.Settings.PriceSource, this.Settings.League ?? string.Empty, this.Settings.RefreshIntervalMin);
-            PoeNinjaPriceFetcher.Initialize(this.DllDirectory);
         }
 
         /// <inheritdoc/>
@@ -122,43 +121,9 @@ namespace StashValue
             changed |= ImGui.SliderFloat("Vertical Offset", ref this.Settings.PriceOffsetY, -50f, 50f);
             changed |= ImGui.ColorEdit4("Text Color", ref this.Settings.TextColor);
 
-            ImGui.Separator();
-            ImGui.Text("Price Source");
-            if (ImGui.RadioButton("poe2scout", this.Settings.PriceSource == PoeNinjaPriceFetcher.SourcePoe2Scout))
-            {
-                this.Settings.PriceSource = PoeNinjaPriceFetcher.SourcePoe2Scout;
-                changed = true;
-            }
-            ImGui.SameLine();
-            if (ImGui.RadioButton("poe.ninja", this.Settings.PriceSource == PoeNinjaPriceFetcher.SourcePoeNinja))
-            {
-                this.Settings.PriceSource = PoeNinjaPriceFetcher.SourcePoeNinja;
-                changed = true;
-            }
-
-            changed |= ImGui.InputText("League", ref this.Settings.League, 64);
-            changed |= ImGui.SliderInt("Refresh interval (min)", ref this.Settings.RefreshIntervalMin, 1, 120);
-
             if (changed)
             {
                 this.SaveSettings();
-            }
-
-            if (ImGui.Button("Refresh prices now"))
-            {
-                PoeNinjaPriceFetcher.Configure(this.Settings.PriceSource, this.Settings.League ?? string.Empty, this.Settings.RefreshIntervalMin);
-                PoeNinjaPriceFetcher.ForceRefresh(this.DllDirectory, ignoreCooldown: true);
-            }
-
-            ImGui.SameLine();
-            if (PoeNinjaPriceFetcher.IsFetching)
-            {
-                ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.2f, 1f), "Loading...");
-            }
-            else if (PoeNinjaPriceFetcher.LastFetchUtc > DateTime.MinValue)
-            {
-                var mins = Math.Max(0, (int)(DateTime.UtcNow - PoeNinjaPriceFetcher.LastFetchUtc).TotalMinutes);
-                ImGui.TextColored(new Vector4(0.5f, 0.8f, 0.5f, 1f), $"{PoeNinjaPriceFetcher.LoadedItemCount} items | {mins} min ago");
             }
         }
 
@@ -206,9 +171,6 @@ namespace StashValue
         public override void DrawUI()
         {
             if (Core.States.GameCurrentState != GameStateTypes.InGameState) return;
-
-            PoeNinjaPriceFetcher.Configure(this.Settings.PriceSource, this.Settings.League ?? string.Empty, this.Settings.RefreshIntervalMin);
-            PoeNinjaPriceFetcher.RefreshIfNeeded();
 
             if (this.Settings.ShowDebugInfo)
             {
@@ -423,14 +385,14 @@ namespace StashValue
             {
                 foreach (var key in ArtKeyVariants(artBasename))
                 {
-                    if (PoeNinjaPriceFetcher.TryResolveDisplayName(key, out var uniqueName) &&
-                        !PoeNinjaPriceFetcher.IsGenericLookupName(uniqueName))
+                    if (MarketPrices.TryResolveDisplayName(key, out var uniqueName) &&
+                        !MarketPrices.IsGenericLookupName(uniqueName))
                     {
                         itemName = uniqueName;
                         break;
                     }
 
-                    if (PoeNinjaPriceFetcher.HasPriceDataForName(key))
+                    if (MarketPrices.HasPriceDataForName(key))
                     {
                         itemName = key;
                         break;
@@ -441,14 +403,14 @@ namespace StashValue
             if (string.IsNullOrWhiteSpace(itemName)) return false;
 
             var modLines = ItemModHelper.GetModLines(item);
-            var price = PoeNinjaPriceFetcher.GetPrice(itemName, modLines, internalName, fullItemPath);
+            var price = MarketPrices.GetPrice(itemName, modLines, internalName, fullItemPath);
             if (price == null) return false;
 
             var stack = item.TryGetComponent<Stack>(out var stackComp) && stackComp.Count > 1 ? stackComp.Count : 1;
             var priceChaos = price.PriceChaos * stack;
 
-            var priced = new PoeNinjaPrice { PriceChaos = priceChaos };
-            var (displayValue, displayCurrency) = PoeNinjaPriceFetcher.GetDisplayPrice(priced, this.Settings.DisplayCurrency);
+            var priced = new MarketPrice { PriceChaos = priceChaos };
+            var (displayValue, displayCurrency) = MarketPrices.GetDisplayPrice(priced, this.Settings.DisplayCurrency);
 
             if (this.Settings.MinValueEx > 0f && displayValue < this.Settings.MinValueEx)
             {

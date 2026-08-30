@@ -11,6 +11,7 @@ namespace RitualHelper
     using System.Reflection;
     using System.Text.RegularExpressions;
     using GameHelper;
+    using GameHelper.Data;
     using GameHelper.Plugin;
     using GameHelper.RemoteEnums;
     using GameHelper.RemoteObjects.Components;
@@ -41,7 +42,6 @@ namespace RitualHelper
         private object? handleObj;
         private bool wasRitualWindowOpen;
         private Dictionary<string, string>? customNamesCache;
-        private int selectedLeagueIndex = -1;
         private bool iconsReloadPending;
         private int? pendingSoundPlayback;
         private readonly List<PriceLabelDraw> cachedPriceLabels = new();
@@ -59,8 +59,6 @@ namespace RitualHelper
         {
             try
             {
-            LeagueProvider.EnsureLoaded();
-
             if (ImGui.BeginTabBar("##RitualHelperTabs"))
             {
                 if (ImGui.BeginTabItem(this.PluginText.Title("tab.general", "General", "RitualHelperGeneralTab")))
@@ -116,36 +114,6 @@ namespace RitualHelper
                     ImGui.EndTabItem();
                 }
 
-                if (ImGui.BeginTabItem(this.PluginText.Title("tab.data_source", "Data Source", "RitualHelperDataSourceTab")))
-                {
-                    this.DrawPriceSourceSelector();
-                    this.DrawLeagueSelector();
-
-                    ImGui.SliderInt(this.PluginText.Label("settings.refresh_interval", "Refresh interval (min)", "RitualHelperRefreshInterval"), ref this.Settings.RefreshIntervalMin, 1, 120);
-                    if (ImGui.Button(this.PluginText.Label("button.refresh_prices", "Refresh Prices Now", "RitualHelperRefreshPrices")))
-                    {
-                        PoeNinjaPriceFetcher.Configure(this.Settings.PriceSource, this.Settings.League ?? string.Empty, this.Settings.RefreshIntervalMin);
-                        PoeNinjaPriceFetcher.ForceRefresh(this.DllDirectory);
-                    }
-
-                    ImGui.SameLine();
-                    if (PoeNinjaPriceFetcher.IsFetching || LeagueProvider.IsLoading)
-                    {
-                        ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.2f, 1f), this.PluginText.T("status.loading", "Loading..."));
-                    }
-                    else if (PoeNinjaPriceFetcher.LastFetchUtc > DateTime.MinValue)
-                    {
-                        var mins = Math.Max(0, (int)(DateTime.UtcNow - PoeNinjaPriceFetcher.LastFetchUtc).TotalMinutes);
-                        ImGui.TextColored(new Vector4(0.5f, 0.8f, 0.5f, 1f),
-                            this.PluginText.F("status.fetch_summary", "{0} items | {1} min ago", PoeNinjaPriceFetcher.LoadedItemCount, mins));
-                    }
-
-                    ImGui.TextWrapped(
-                        this.PluginText.T("settings.price_source_help", "Prices are estimates from poe2scout / poe.ninja (not live trade). Uniques use the higher of scout and ninja. Refresh after league economy shifts."));
-
-                    ImGui.EndTabItem();
-                }
-
                 if (ImGui.BeginTabItem(this.PluginText.Title("tab.advanced", "Advanced", "RitualHelperAdvancedTab")))
                 {
                     ImGui.Checkbox(this.PluginText.Label("settings.debug_mode", "Debug Mode (Show All Inventories)", "RitualHelperDebugMode"), ref this.Settings.DebugMode);
@@ -175,91 +143,12 @@ namespace RitualHelper
             }
         }
 
-        private void DrawLeagueSelector()
-        {
-            var leagues = LeagueProvider.Leagues;
-            if (leagues.Count == 0)
-            {
-                ImGui.InputText(this.PluginText.Label("settings.league", "League", "RitualHelperLeagueInput"), ref this.Settings.League, 64);
-                return;
-            }
-
-            if (this.selectedLeagueIndex < 0 || this.selectedLeagueIndex >= leagues.Count ||
-                !string.Equals(leagues[this.selectedLeagueIndex], this.Settings.League, StringComparison.OrdinalIgnoreCase))
-            {
-                this.selectedLeagueIndex = 0;
-                for (var i = 0; i < leagues.Count; i++)
-                {
-                    if (string.Equals(leagues[i], this.Settings.League, StringComparison.OrdinalIgnoreCase))
-                    {
-                        this.selectedLeagueIndex = i;
-                        break;
-                    }
-                }
-            }
-
-            ImGui.SetNextItemWidth(260f);
-            if (ImGui.BeginCombo(this.PluginText.Label("settings.league", "League", "RitualHelperLeagueCombo"), leagues[this.selectedLeagueIndex]))
-            {
-                for (var i = 0; i < leagues.Count; i++)
-                {
-                    if (ImGui.Selectable(leagues[i], i == this.selectedLeagueIndex))
-                    {
-                        this.selectedLeagueIndex = i;
-                        this.Settings.League = leagues[i];
-                    }
-                }
-
-                ImGui.EndCombo();
-            }
-        }
-
-        private void DrawPriceSourceSelector()
-        {
-            ImGui.Text(this.PluginText.T("settings.price_source", "Price source:"));
-            var previousSource = this.Settings.PriceSource;
-
-            if (ImGui.RadioButton("poe.ninja", this.Settings.PriceSource == PoeNinjaPriceFetcher.SourcePoeNinja))
-            {
-                this.Settings.PriceSource = PoeNinjaPriceFetcher.SourcePoeNinja;
-            }
-
-            ImGui.SameLine();
-            if (ImGui.RadioButton("poe2scout", this.Settings.PriceSource == PoeNinjaPriceFetcher.SourcePoe2Scout))
-            {
-                this.Settings.PriceSource = PoeNinjaPriceFetcher.SourcePoe2Scout;
-            }
-
-            if (this.Settings.PriceSource != previousSource)
-            {
-                PoeNinjaPriceFetcher.Configure(
-                    this.Settings.PriceSource,
-                    this.Settings.League ?? string.Empty,
-                    this.Settings.RefreshIntervalMin);
-                PoeNinjaPriceFetcher.ForceRefresh(this.DllDirectory, ignoreCooldown: true);
-            }
-        }
-
-        private void NormalizePriceSourceSetting()
-        {
-            if (this.Settings.PriceSource == PoeNinjaPriceFetcher.SourcePoeNinja ||
-                this.Settings.PriceSource == PoeNinjaPriceFetcher.SourcePoe2Scout)
-            {
-                return;
-            }
-
-            this.Settings.PriceSource = PoeNinjaPriceFetcher.SourcePoe2Scout;
-        }
-
         public override void DrawUI()
         {
             try
             {
             if (!this.Settings.ShowOverlay && !this.Settings.DebugMode) return;
             if (Core.States.GameCurrentState != GameStateTypes.InGameState) return;
-
-            PoeNinjaPriceFetcher.Configure(this.Settings.PriceSource, this.Settings.League ?? string.Empty, this.Settings.RefreshIntervalMin);
-            PoeNinjaPriceFetcher.RefreshIfNeeded();
 
             if (this.iconsReloadPending || !this.currencyIcons.TryGet("divine.png", out _, out _, out _))
             {
@@ -271,7 +160,6 @@ namespace RitualHelper
             {
                 if (this.handleObj == null)
                 {
-                    PoeNinjaPriceFetcher.Initialize(this.DllDirectory);
                     this.currencyIcons.Initialize(this.DllDirectory);
                     this.iconsReloadPending = true;
 
@@ -463,14 +351,14 @@ namespace RitualHelper
                             // and accept either an icon-map hit or a direct price-index hit.
                             foreach (var key in ArtKeyVariants(artBasename))
                             {
-                                if (PoeNinjaPriceFetcher.TryResolveDisplayName(key, out var uniqueFromArt) &&
-                                    !PoeNinjaPriceFetcher.IsGenericLookupName(uniqueFromArt))
+                                if (MarketPrices.TryResolveDisplayName(key, out var uniqueFromArt) &&
+                                    !MarketPrices.IsGenericLookupName(uniqueFromArt))
                                 {
                                     itemName = uniqueFromArt;
                                     break;
                                 }
 
-                                if (PoeNinjaPriceFetcher.HasPriceDataForName(key))
+                                if (MarketPrices.HasPriceDataForName(key))
                                 {
                                     itemName = key;
                                     break;
@@ -494,7 +382,7 @@ namespace RitualHelper
 
                 var mods = memoryMods;
                 itemName = this.ResolveItemDisplayName(itemName, internalNameOnly);
-                var priceInfo = PoeNinjaPriceFetcher.GetPrice(itemName, mods, internalNameOnly, fullItemPath, scoutText);
+                var priceInfo = MarketPrices.GetPrice(itemName, mods, internalNameOnly, fullItemPath, scoutText);
 
                 var diagFontSize = ImGui.GetFontSize() * this.Settings.PriceFontScale * 0.8f;
                 if (priceInfo == null)
@@ -520,16 +408,16 @@ namespace RitualHelper
 
                 if (this.Settings.MinDisplayExalted > 0f)
                 {
-                    var (exValue, _) = PoeNinjaPriceFetcher.GetDisplayPrice(
-                        new PoeNinjaPrice { PriceChaos = priceChaos }, 1);
+                    var (exValue, _) = MarketPrices.GetDisplayPrice(
+                        new MarketPrice { PriceChaos = priceChaos }, 1);
                     if (exValue < this.Settings.MinDisplayExalted)
                         continue;
                 }
 
-                var (displayValue, displayCurrency) = PoeNinjaPriceFetcher.GetDisplayPrice(
-                    new PoeNinjaPrice { PriceChaos = priceChaos },
+                var (displayValue, displayCurrency) = MarketPrices.GetDisplayPrice(
+                    new MarketPrice { PriceChaos = priceChaos },
                     this.Settings.DisplayCurrency);
-                var divineValue = priceChaos / Math.Max(PoeNinjaPriceFetcher.GetChaosPerDivine(), 1.0);
+                var divineValue = priceChaos / Math.Max(MarketPrices.GetChaosPerDivine(), 1.0);
                 if (this.Settings.PlayValueAlert && divineValue >= this.Settings.AlertMinDivine)
                 {
                     var alertKey = string.IsNullOrEmpty(internalNameOnly) ? itemName : internalNameOnly;
@@ -921,7 +809,7 @@ namespace RitualHelper
                 return string.IsNullOrEmpty(suffix) ? pretty : $"{pretty} {suffix}";
             }
 
-            if (PoeNinjaPriceFetcher.TryResolveDisplayName(internalName, out var scoutName))
+            if (MarketPrices.TryResolveDisplayName(internalName, out var scoutName))
             {
                 isMapped = true;
                 return scoutName;
@@ -930,7 +818,7 @@ namespace RitualHelper
             var clean = System.Text.RegularExpressions.Regex.Replace(internalName, "([A-Z])", " $1").Trim();
             clean = clean.Replace("Four ", string.Empty, StringComparison.Ordinal);
             clean = System.Text.RegularExpressions.Regex.Replace(clean, @"\d+", string.Empty).Trim();
-            if (PoeNinjaPriceFetcher.IsGenericLookupName(clean))
+            if (MarketPrices.IsGenericLookupName(clean))
                 return internalName;
 
             return clean;
@@ -940,7 +828,7 @@ namespace RitualHelper
         {
             if (!string.IsNullOrWhiteSpace(currentName) &&
                 !currentName.StartsWith("Item ", StringComparison.Ordinal) &&
-                !PoeNinjaPriceFetcher.IsGenericLookupName(currentName))
+                !MarketPrices.IsGenericLookupName(currentName))
             {
                 return currentName;
             }
@@ -980,10 +868,6 @@ namespace RitualHelper
                 }
             }
 
-            this.NormalizePriceSourceSetting();
-            LeagueProvider.EnsureLoaded();
-            PoeNinjaPriceFetcher.Configure(this.Settings.PriceSource, this.Settings.League ?? string.Empty, this.Settings.RefreshIntervalMin);
-            PoeNinjaPriceFetcher.Initialize(this.DllDirectory);
             this.currencyIcons.Initialize(this.DllDirectory);
             this.iconsReloadPending = true;
         }

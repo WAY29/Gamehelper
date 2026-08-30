@@ -6,6 +6,7 @@ namespace LootTracker
     using System.Runtime.InteropServices;
     using System.Text;
     using GameHelper;
+    using GameHelper.Data;
     using GameHelper.Localization;
     using GameHelper.Plugin;
     using GameHelper.RemoteEnums;
@@ -95,9 +96,6 @@ namespace LootTracker
         private DateTime sessionStartUtc = DateTime.UtcNow;
         private bool onMapArea;                  // true while the current area is a map (not hideout/town)
 
-        private readonly PriceCache priceCache = new();
-        private DateTime nextAutoRefreshCheckUtc = DateTime.MinValue;
-
         // {BaseItemType.Id last segment → ItemVisualIdentity dds-art basename}, for the items whose
         // metadata id diverges from their art id (essences, soul cores, runes, many currencies — see
         // docs/poe-ninja-api.md). poe.ninja keys prices by the art id, so a read-off-memory item must
@@ -117,7 +115,6 @@ namespace LootTracker
         private string LF(string key, string fallback, params object[] args) => this.Loc.F(key, fallback, args);
 
         private string SettingPathname => Path.Join(this.DllDirectory, "config", "settings.txt");
-        private string PriceCachePathname => Path.Join(this.DllDirectory, "config", "prices.json");
         private string MetaArtPathname => Path.Join(this.DllDirectory, "metaArt.json");
         private string IconsDir => Path.Join(this.DllDirectory, "icons");
 
@@ -198,8 +195,8 @@ namespace LootTracker
             // unique stays unpriced instead.
             if (rarity == 3 && renderArt.Length > 0)
             {
-                bool up = this.priceCache.TryGetPriceByArtId(renderArt, out unit) && unit > 0;
-                label = this.priceCache.TryGetNameByArtId(renderArt, out var unm) && unm.Length > 0 ? unm : renderArt;
+                bool up = MarketPrices.TryGetPriceByArtId(renderArt, out unit) && unit > 0;
+                label = MarketPrices.TryGetNameByArtId(renderArt, out var unm) && unm.Length > 0 ? unm : renderArt;
                 if (!up) unit = 0;
                 return up;
             }
@@ -208,12 +205,12 @@ namespace LootTracker
             var variantKey = art + RarityVariant(rarity);
 
             bool priced;
-            if (this.priceCache.TryGetPriceByArtId(variantKey, out unit) && unit > 0) priced = true;
-            else if (this.priceCache.TryGetPriceByArtId(art, out unit) && unit > 0) priced = true;
+            if (MarketPrices.TryGetPriceByArtId(variantKey, out unit) && unit > 0) priced = true;
+            else if (MarketPrices.TryGetPriceByArtId(art, out unit) && unit > 0) priced = true;
             else { unit = 0; priced = false; }
 
-            if (this.priceCache.TryGetNameByArtId(variantKey, out var nm) && nm.Length > 0) label = nm;
-            else if (this.priceCache.TryGetNameByArtId(art, out nm) && nm.Length > 0) label = nm;
+            if (MarketPrices.TryGetNameByArtId(variantKey, out var nm) && nm.Length > 0) label = nm;
+            else if (MarketPrices.TryGetNameByArtId(art, out nm) && nm.Length > 0) label = nm;
             else label = art;
 
             return priced;
@@ -249,10 +246,6 @@ namespace LootTracker
             this.LoadMetaArtMap();
             this.LoadIcons();
             this.LoadActiveState(); // resume an in-progress session that survived a close/crash
-
-            var fresh = this.priceCache.TryLoadFromDisk(this.PriceCachePathname, this.Settings.CacheTtlMinutes);
-            if (!fresh)
-                this.priceCache.StartRefresh(this.Settings.League, this.PriceCachePathname);
         }
 
         public override void OnDisable()
@@ -309,7 +302,6 @@ namespace LootTracker
         public override void SaveSettings()
         {
             Directory.CreateDirectory(Path.GetDirectoryName(this.SettingPathname)!);
-            this.Settings.LastSyncUtc = this.priceCache.LastSyncUtc;
             File.WriteAllText(this.SettingPathname, JsonConvert.SerializeObject(this.Settings, Formatting.Indented));
         }
 
@@ -381,33 +373,6 @@ namespace LootTracker
             ImGui.Spacing();
             ImGui.SeparatorText(this.L("lt.active_session", "Active session"));
             this.DrawActiveSessionTable();
-
-            ImGui.Spacing();
-            ImGui.Separator();
-
-            ImGui.SeparatorText(this.L("lt.pricing", "Pricing"));
-            ImGui.InputText(this.L("lt.league", "League"), ref this.Settings.League, 64);
-            ImGui.SliderInt(this.L("lt.refresh_interval", "Refresh interval (min)"), ref this.Settings.CacheTtlMinutes, 5, 60);
-
-            var status = this.priceCache.Status;
-            string statusText = status switch
-            {
-                PriceSyncStatus.Syncing => this.L("lt.status_syncing", "syncing…"),
-                PriceSyncStatus.Ready => this.priceCache.LastSyncUtc == DateTime.MinValue
-                    ? this.L("lt.status_ready_nodata", "ready (no data yet)")
-                    : this.LF("lt.status_updated_ago", "updated {0} ago", FormatRelative(this.priceCache.LastSyncUtc)),
-                PriceSyncStatus.Error => this.LF("lt.status_error", "error: {0}", this.priceCache.LastError),
-                _ => this.L("lt.status_idle", "idle"),
-            };
-            ImGui.Text(this.LF("lt.status_label", "Status: {0}", statusText));
-            ImGui.Text(this.LF("lt.items_cached", "Items cached: {0}", this.priceCache.PriceCount));
-            if (this.priceCache.DivineToExaltedRate > 0)
-                ImGui.Text(this.LF("lt.divine_rate", "1 Divine = {0:F2} Exalted", this.priceCache.DivineToExaltedRate));
-
-            ImGui.BeginDisabled(status == PriceSyncStatus.Syncing);
-            if (ImGui.Button(this.L("lt.refresh_now", "Refresh now")))
-                this.priceCache.StartRefresh(this.Settings.League, this.PriceCachePathname);
-            ImGui.EndDisabled();
         }
 
         public override void DrawUI()
@@ -422,7 +387,6 @@ namespace LootTracker
                 return;
             }
 
-            this.MaybeAutoRefreshPrices();
             this.UpdateAreaState();
             this.ScanKills();
             this.UpdateLiveInventory();
@@ -476,28 +440,6 @@ namespace LootTracker
             this.ResetKillTally();
             this.ClearPickupToasts();
             this.DeleteActiveState(); // archived to history above; the autosave mirror is now obsolete
-        }
-
-        // Re-fetch prices once the cache ages past the TTL (checked at most once a minute).
-        private void MaybeAutoRefreshPrices()
-        {
-            var now = DateTime.UtcNow;
-            if (now < this.nextAutoRefreshCheckUtc)
-            {
-                return;
-            }
-
-            this.nextAutoRefreshCheckUtc = now.AddMinutes(1);
-            if (this.priceCache.Status == PriceSyncStatus.Syncing)
-            {
-                return;
-            }
-
-            var age = now - this.priceCache.LastSyncUtc;
-            if (age > TimeSpan.FromMinutes(Math.Max(1, this.Settings.CacheTtlMinutes)))
-            {
-                this.priceCache.StartRefresh(this.Settings.League, this.PriceCachePathname);
-            }
         }
 
         // Autosave the live session at most every ~20s, so a crash mid-map loses only the last few

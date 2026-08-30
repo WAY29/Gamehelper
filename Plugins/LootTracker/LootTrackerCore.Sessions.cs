@@ -3,6 +3,7 @@ namespace LootTracker
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using GameHelper.Data;
     using ImGuiNET;
     using Newtonsoft.Json;
 
@@ -193,7 +194,7 @@ namespace LootTracker
             {
                 StartUtc = startUtc,
                 EndUtc = endUtc,
-                DivineRate = this.priceCache.DivineToExaltedRate,
+                DivineRate = MarketPrices.DivineToExaltedRate,
             };
 
             foreach (var r in this.completed)
@@ -483,7 +484,7 @@ namespace LootTracker
             if (this.lootRun != null)
             {
                 m = this.BuildSessionMap(this.lootRun);
-                rate = this.priceCache.DivineToExaltedRate; // live run → current rate
+                rate = MarketPrices.DivineToExaltedRate; // live run → current rate
             }
             else
             {
@@ -552,7 +553,7 @@ namespace LootTracker
                 return;
             }
 
-            var rate = this.priceCache.DivineToExaltedRate;
+            var rate = MarketPrices.DivineToExaltedRate;
             bool div = this.Settings.ShowPricesInDivineOnly && rate > 0;
 
             if (ImGui.BeginTable("active_runs_tbl", 4,

@@ -5,6 +5,7 @@ namespace RunecraftHelper
     using System.IO;
     using System.Numerics;
     using GameHelper;
+    using GameHelper.Data;
     using GameHelper.RemoteEnums.Entity;
     using GameHelper.RemoteObjects.Components;
     using GameHelper.RemoteObjects.States.InGameStateObjects;
@@ -341,14 +342,14 @@ namespace RunecraftHelper
         private string FormatRewardPrice(double exalted)
         {
             if (exalted <= 0) return "—";
-            double rate = this.priceCache.DivineToExaltedRate;
+            double rate = MarketPrices.DivineToExaltedRate;
             if (rate > 0 && exalted >= rate) return FormatDivine(exalted / rate);
             return $"{exalted:F0} ex";
         }
 
         private uint PriceColor(double best, double maxBest, out bool tinted)
         {
-            double rate = this.priceCache.DivineToExaltedRate;
+            double rate = MarketPrices.DivineToExaltedRate;
             if (rate > 0 && best >= rate) { tinted = true; return ColorYellow; }
             return this.MonolithValueColor(best, maxBest, out tinted);
         }
@@ -997,7 +998,7 @@ namespace RunecraftHelper
                             this.metaToLocalName.TryGetValue(rec.reward.id, out var localName))
                     ? localName
                     : rec.reward.name;
-                if (this.priceCache.TryGetExaltedPrice(rec.reward.name, out var u) && u > 0)
+                if (MarketPrices.TryGetExaltedPrice(rec.reward.name, out var u) && u > 0)
                 {
                     c.UnitEx = u;
                     c.Priced = true;

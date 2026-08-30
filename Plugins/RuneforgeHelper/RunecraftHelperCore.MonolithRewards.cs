@@ -5,6 +5,7 @@ namespace RunecraftHelper
     using System.IO;
     using System.Numerics;
     using GameHelper;
+    using GameHelper.Data;
     using GameHelper.RemoteEnums.Entity;
     using GameHelper.RemoteObjects.Components;
     using GameHelper.RemoteObjects.States.InGameStateObjects;
@@ -697,7 +698,7 @@ namespace RunecraftHelper
             if (rec.reward != null && !string.IsNullOrEmpty(rec.reward.name))
             {
                 c.Reward = rec.reward.name;
-                if (this.priceCache.TryGetExaltedPrice(rec.reward.name, out var u) && u > 0)
+                if (MarketPrices.TryGetExaltedPrice(rec.reward.name, out var u) && u > 0)
                 {
                     c.UnitEx = u;
                     c.Priced = true;

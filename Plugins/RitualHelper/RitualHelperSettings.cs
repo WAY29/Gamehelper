@@ -12,15 +12,6 @@ namespace RitualHelper
     /// </summary>
     public sealed class RitualHelperSettings : IPSettings
     {
-        /// <summary>Price source: <see cref="PoeNinjaPriceFetcher.SourcePoeNinja"/> or <see cref="PoeNinjaPriceFetcher.SourcePoe2Scout"/>.</summary>
-        public int PriceSource = PoeNinjaPriceFetcher.SourcePoe2Scout;
-
-        /// <summary>PoE2 league name for price lookups.</summary>
-        public string League = "Runes of Aldur";
-
-        /// <summary>Automatic price refresh interval in minutes.</summary>
-        public int RefreshIntervalMin = 5;
-
         /// <summary>Display currency: 0 = Divine, 1 = Exalted, 2 = Chaos.</summary>
         public int DisplayCurrency = 1;
 

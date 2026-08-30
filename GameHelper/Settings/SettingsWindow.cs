@@ -13,6 +13,7 @@ namespace GameHelper.Settings
     using Coroutine;
     using CoroutineEvents;
     using ImGuiNET;
+    using GameHelper.Data;
     using Plugin;
     using Utils;
     using GameOffsets.Objects.States.InGameState;
@@ -31,7 +32,9 @@ namespace GameHelper.Settings
         private static bool isSettingsWindowVisible = true;
         private const string GeneralPageId = "core:general";
         private const string PluginManagerPageId = "core:plugins";
+        private const string DataSourcesPageId = "core:datasources";
         private static string selectedSettingsPage = PluginManagerPageId;
+        private static int selectedMarketLeagueIndex = -1;
         private static string pluginReloadStatus = string.Empty;
 
         private static EntityFilterType efilterType = EntityFilterType.PATH;
@@ -127,6 +130,7 @@ namespace GameHelper.Settings
 
             DrawNavigationItem(GeneralPageId, L.T("settings.tabs.general", "General"));
             DrawNavigationItem(PluginManagerPageId, L.T("settings.tabs.plugins", "Plugins"));
+            DrawNavigationItem(DataSourcesPageId, L.T("settings.tabs.datasources", "Data Sources"));
 
             ImGui.Separator();
             ImGui.Spacing();
@@ -180,6 +184,12 @@ namespace GameHelper.Settings
                 return;
             }
 
+            if (selectedSettingsPage == DataSourcesPageId)
+            {
+                DrawDataSourcesSettings();
+                return;
+            }
+
             var selectedPlugin = enabledPlugins.FirstOrDefault(
                 container => selectedSettingsPage == PluginPageId(container.Name));
             if (selectedPlugin != null)
@@ -198,7 +208,9 @@ namespace GameHelper.Settings
 
         private static void EnsureSelectedSettingsPage(IReadOnlyCollection<PluginContainer> enabledPlugins)
         {
-            if (selectedSettingsPage == GeneralPageId || selectedSettingsPage == PluginManagerPageId)
+            if (selectedSettingsPage == GeneralPageId ||
+                selectedSettingsPage == PluginManagerPageId ||
+                selectedSettingsPage == DataSourcesPageId)
             {
                 return;
             }
@@ -399,6 +411,135 @@ namespace GameHelper.Settings
                     "Reload failed; check console/log output.");
                 Console.WriteLine($"[SettingsWindow.ReloadAllPlugins] {ex}");
             }
+        }
+
+        private static void DrawDataSourcesSettings()
+        {
+            ImGuiTheme.SectionHeader(
+                L.T("settings.datasources.market.title", "Market Prices"),
+                L.T(
+                    "settings.datasources.market.subtitle",
+                    "Shared by LootValue, RitualHelper, StashValue, LootTracker, RunecraftHelper, and RuneforgeHelper."));
+
+            LeagueProvider.EnsureLoaded();
+            MarketPrices.Touch();
+
+            var source = Core.GHSettings.MarketPriceSource;
+            ImGui.Text(L.T("settings.datasources.market.source", "Price source"));
+            if (ImGui.RadioButton("poe2scout", source == MarketPrices.SourcePoe2Scout))
+            {
+                Core.GHSettings.MarketPriceSource = MarketPrices.SourcePoe2Scout;
+                MarketPrices.ForceRefresh(ignoreCooldown: true);
+            }
+
+            ImGui.SameLine();
+            if (ImGui.RadioButton("poe.ninja", source == MarketPrices.SourcePoeNinja))
+            {
+                Core.GHSettings.MarketPriceSource = MarketPrices.SourcePoeNinja;
+                MarketPrices.ForceRefresh(ignoreCooldown: true);
+            }
+
+            DrawMarketLeagueSelector();
+
+            var refresh = Core.GHSettings.MarketRefreshMinutes;
+            if (ImGui.SliderInt(
+                    L.Label("settings.datasources.market.refresh", "Refresh interval (min)", "MarketRefreshMinutes"),
+                    ref refresh,
+                    1,
+                    120))
+            {
+                Core.GHSettings.MarketRefreshMinutes = Math.Max(1, refresh);
+            }
+
+            if (ImGui.Button(L.T("settings.datasources.market.refresh_now", "Refresh prices now")))
+            {
+                MarketPrices.ForceRefresh(ignoreCooldown: true);
+            }
+
+            ImGui.SameLine();
+            if (MarketPrices.IsFetching || LeagueProvider.IsLoading)
+            {
+                ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.2f, 1f), L.T("settings.datasources.market.loading", "Loading..."));
+            }
+            else if (MarketPrices.LastFetchUtc > DateTime.MinValue)
+            {
+                var mins = Math.Max(0, (int)(DateTime.UtcNow - MarketPrices.LastFetchUtc).TotalMinutes);
+                ImGui.TextColored(
+                    new Vector4(0.5f, 0.8f, 0.5f, 1f),
+                    L.F("settings.datasources.market.status", "{0} items | {1} min ago", MarketPrices.LoadedItemCount, mins));
+            }
+
+            if (!string.IsNullOrEmpty(MarketPrices.LastError))
+            {
+                ImGui.TextColored(new Vector4(0.95f, 0.45f, 0.35f, 1f), MarketPrices.LastError);
+            }
+
+            if (MarketPrices.DivineToExaltedRate > 0)
+            {
+                ImGui.TextDisabled(L.F(
+                    "settings.datasources.market.divine_rate",
+                    "1 Divine = {0:F2} Exalted",
+                    MarketPrices.DivineToExaltedRate));
+            }
+
+            ImGui.TextWrapped(L.T(
+                "settings.datasources.market.help",
+                "Prices are estimates from poe2scout / poe.ninja, not live trade listings."));
+        }
+
+        private static void DrawMarketLeagueSelector()
+        {
+            var current = Core.GHSettings.MarketLeague ?? string.Empty;
+            var leagues = new List<string>(LeagueProvider.Leagues);
+            if (leagues.Count == 0)
+            {
+                if (ImGui.InputText(L.Label("settings.datasources.market.league", "League", "MarketLeague"), ref current, 64))
+                {
+                    Core.GHSettings.MarketLeague = current;
+                    MarketPrices.ForceRefresh(ignoreCooldown: true);
+                }
+
+                return;
+            }
+
+            if (!leagues.Exists(name => string.Equals(name, current, StringComparison.OrdinalIgnoreCase)) &&
+                !string.IsNullOrWhiteSpace(current))
+            {
+                leagues.Insert(0, current);
+            }
+
+            if (selectedMarketLeagueIndex < 0 ||
+                selectedMarketLeagueIndex >= leagues.Count ||
+                !string.Equals(leagues[selectedMarketLeagueIndex], current, StringComparison.OrdinalIgnoreCase))
+            {
+                selectedMarketLeagueIndex = 0;
+                for (var i = 0; i < leagues.Count; i++)
+                {
+                    if (string.Equals(leagues[i], current, StringComparison.OrdinalIgnoreCase))
+                    {
+                        selectedMarketLeagueIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            ImGui.SetNextItemWidth(260f);
+            if (!ImGui.BeginCombo(L.Label("settings.datasources.market.league", "League", "MarketLeague"), leagues[selectedMarketLeagueIndex]))
+            {
+                return;
+            }
+
+            for (var i = 0; i < leagues.Count; i++)
+            {
+                if (ImGui.Selectable(leagues[i], i == selectedMarketLeagueIndex))
+                {
+                    selectedMarketLeagueIndex = i;
+                    Core.GHSettings.MarketLeague = leagues[i];
+                    MarketPrices.ForceRefresh(ignoreCooldown: true);
+                }
+            }
+
+            ImGui.EndCombo();
         }
 
         /// <summary>

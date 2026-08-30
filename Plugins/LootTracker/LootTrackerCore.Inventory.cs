@@ -6,6 +6,7 @@ namespace LootTracker
     using System.Runtime.InteropServices;
     using System.Text;
     using GameHelper;
+    using GameHelper.Data;
     using GameHelper.RemoteObjects.UiElement;
     using ImGuiNET;
 
@@ -24,7 +25,7 @@ namespace LootTracker
         // Divine→Exalted rate exists to convert by. While the rate is unknown we keep Exalted so the
         // numbers never blank out.
         private bool DivineOnly =>
-            this.Settings.ShowPricesInDivineOnly && this.priceCache.DivineToExaltedRate > 0;
+            this.Settings.ShowPricesInDivineOnly && MarketPrices.DivineToExaltedRate > 0;
 
         // ── Map strip ────────────────────────────────────────────────────
         // A slim, click-through line pinned to the bottom of the game window (right side by default),
@@ -80,7 +81,7 @@ namespace LootTracker
             if (this.DrawInlineIcon("Time")) ImGui.SameLine(0f, pad);
             ImGui.TextUnformatted(FormatDuration(this.CurrentLiveTime()));
 
-            var rate = this.priceCache.DivineToExaltedRate;
+            var rate = MarketPrices.DivineToExaltedRate;
             if (this.DivineOnly)
             {
                 // +Y [divine] only — Exalted hidden by user choice.
@@ -191,7 +192,7 @@ namespace LootTracker
             double perHour = totalActive.TotalHours > 0 ? totalEx / totalActive.TotalHours : 0;
             TimeSpan avgTime = maps > 0 ? totalActive / maps : TimeSpan.Zero;
             double avgProfit = maps > 0 ? totalEx / maps : 0;
-            var rate = this.priceCache.DivineToExaltedRate;
+            var rate = MarketPrices.DivineToExaltedRate;
             float colGap = 28f * s;
 
             // Column 1 — per-map aggregates (with icons). The New-session button now lives in the

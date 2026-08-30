@@ -1,21 +1,14 @@
-using System;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
-
-namespace RitualHelper
+namespace GameHelper.Data
 {
-    internal static class LeagueProvider
+    using System;
+    using System.Collections.Generic;
+    using System.Net.Http;
+    using System.Threading.Tasks;
+    using Newtonsoft.Json.Linq;
+
+    public static class LeagueProvider
     {
         private static readonly HttpClient Http = CreateHttpClient();
-
-        private static HttpClient CreateHttpClient()
-        {
-            var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
-            client.DefaultRequestHeaders.Add("User-Agent", "RitualHelper-GameHelper-Plugin");
-            return client;
-        }
         private static readonly object Gate = new();
         private static readonly List<string> leagues = new();
         private static bool isLoading;
@@ -23,7 +16,7 @@ namespace RitualHelper
 
         public static IReadOnlyList<string> Leagues
         {
-            get { lock (Gate) return leagues; }
+            get { lock (Gate) return leagues.ToArray(); }
         }
 
         public static bool IsLoading => isLoading;
@@ -52,6 +45,13 @@ namespace RitualHelper
             Task.Run(LoadAsync);
         }
 
+        private static HttpClient CreateHttpClient()
+        {
+            var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+            client.DefaultRequestHeaders.Add("User-Agent", "GameHelper");
+            return client;
+        }
+
         private static async Task LoadAsync()
         {
             var fetched = new List<string>();
@@ -70,7 +70,9 @@ namespace RitualHelper
                     }
                 }
             }
-            catch { }
+            catch
+            {
+            }
 
             lock (Gate)
             {

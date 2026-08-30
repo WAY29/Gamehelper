@@ -308,5 +308,20 @@ namespace GameHelper.Settings
         ///     How many consecutive invalid frames before an entity is removed.
         /// </summary>
         public int StaleEntityFrameThreshold = 120;
+
+        /// <summary>
+        ///     Market price source: 0 = poe.ninja, 1 = poe2scout.
+        /// </summary>
+        public int MarketPriceSource = 1;
+
+        /// <summary>
+        ///     PoE2 league name used for market price lookups.
+        /// </summary>
+        public string MarketLeague = "Runes of Aldur";
+
+        /// <summary>
+        ///     Automatic market price refresh interval in minutes.
+        /// </summary>
+        public int MarketRefreshMinutes = 5;
     }
 }
