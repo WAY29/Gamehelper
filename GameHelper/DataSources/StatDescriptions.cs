@@ -8,6 +8,8 @@ namespace GameHelper.Data
     internal static class StatDescriptions
     {
         private const int ModStat1Offset = 30;
+        private const int ModStat1MinOffset = 126;
+        private const int ModStat1MaxOffset = 130;
 
         private static readonly Regex Quoted = new("\"([^\"]*)\"", RegexOptions.Compiled);
         private static readonly Regex Tag = new(@"\[(?:[^|\]]+\|)?([^\]]+)\]", RegexOptions.Compiled);
@@ -76,14 +78,24 @@ namespace GameHelper.Data
                 }
 
                 var statId = stats[statIndex];
-                if (statId.Length == 0 || !text.TryGetValue(statId, out var loc))
+                if (statId.Length == 0 ||
+                    statId.StartsWith("dummy_stat", StringComparison.Ordinal) ||
+                    !text.TryGetValue(statId, out var loc))
                 {
                     continue;
                 }
 
-                mod.English = loc.English;
-                mod.ZhCn = loc.ZhCn;
-                mod.ZhTw = loc.ZhTw;
+                var min = 0;
+                var max = 0;
+                if (row + ModStat1MaxOffset + 4 <= 4 + ((i + 1) * rowSize))
+                {
+                    min = BitConverter.ToInt32(modsDat.Slice(row + ModStat1MinOffset, 4));
+                    max = BitConverter.ToInt32(modsDat.Slice(row + ModStat1MaxOffset, 4));
+                }
+
+                mod.English = FillRange(loc.English, min, max);
+                mod.ZhCn = FillRange(loc.ZhCn, min, max);
+                mod.ZhTw = FillRange(loc.ZhTw, min, max);
             }
         }
 
@@ -114,7 +126,8 @@ namespace GameHelper.Data
             foreach (var rawLine in text.Split('\n'))
             {
                 var line = rawLine.TrimEnd('\r');
-                if (line.StartsWith("no_description ", StringComparison.Ordinal))
+                var trimmed = line.TrimStart('\t', ' ');
+                if (trimmed.StartsWith("no_description ", StringComparison.Ordinal))
                 {
                     Flush(map, ids, en, zhCn, zhTw);
                     ids.Clear();
@@ -124,7 +137,7 @@ namespace GameHelper.Data
                     continue;
                 }
 
-                if (line == "description")
+                if (trimmed == "description")
                 {
                     Flush(map, ids, en, zhCn, zhTw);
                     ids.Clear();
@@ -139,19 +152,13 @@ namespace GameHelper.Data
                     continue;
                 }
 
-                if (line.StartsWith("lang \"", StringComparison.Ordinal))
+                if (trimmed.StartsWith("lang \"", StringComparison.Ordinal))
                 {
-                    var end = line.LastIndexOf('"');
-                    lang = end > 6 ? line[6..end] : "English";
+                    var end = trimmed.LastIndexOf('"');
+                    lang = end > 6 ? trimmed[6..end] : "English";
                     continue;
                 }
 
-                if (line.Length > 0 && line[0] != '\t')
-                {
-                    continue;
-                }
-
-                var trimmed = line.TrimStart('\t');
                 if (ids.Count == 0 && LooksLikeStatList(trimmed))
                 {
                     foreach (var part in trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries))
@@ -206,11 +213,43 @@ namespace GameHelper.Data
                 return;
             }
 
-            var loc = new CatalogText { English = en, ZhCn = zhCn, ZhTw = zhTw };
             foreach (var id in ids)
             {
-                map[id] = loc;
+                if (map.TryGetValue(id, out var old))
+                {
+                    old.English = en;
+                    if (zhCn.Length > 0)
+                    {
+                        old.ZhCn = zhCn;
+                    }
+
+                    if (zhTw.Length > 0)
+                    {
+                        old.ZhTw = zhTw;
+                    }
+                }
+                else
+                {
+                    map[id] = new CatalogText { English = en, ZhCn = zhCn, ZhTw = zhTw };
+                }
             }
+        }
+
+        private static string FillRange(string text, int min, int max)
+        {
+            if (string.IsNullOrEmpty(text) || (min == 0 && max == 0))
+            {
+                return text;
+            }
+
+            if (max == 0)
+            {
+                max = min;
+            }
+
+            var n = min == max ? $"({min})" : $"({min}—{max})";
+            text = text.Replace("{0:+d}", (min >= 0 && max >= 0 ? "+" : string.Empty) + n, StringComparison.Ordinal);
+            return text.Replace("{0}", n, StringComparison.Ordinal);
         }
 
         private static bool LooksLikeStatList(string trimmed)
@@ -346,6 +385,25 @@ namespace GameHelper.Data
                 !loc.ZhTw.Contains("稀有度"))
             {
                 throw new InvalidOperationException("csd parse");
+            }
+
+            var englishOnly = Encoding.Unicode.GetBytes(
+                "description\n\t1 map_item_drop_rarity_+%\n\t1\n\t\t# \"{0}% increased Rarity of Items found\"\n");
+            var later = new byte[bom.Length + englishOnly.Length];
+            Buffer.BlockCopy(bom, 0, later, 0, bom.Length);
+            Buffer.BlockCopy(englishOnly, 0, later, bom.Length, englishOnly.Length);
+            map = Parse(csd, later);
+            if (!map.TryGetValue("map_item_drop_rarity_+%", out loc) ||
+                loc.ZhTw.Length == 0 ||
+                loc.ZhCn.Length == 0)
+            {
+                throw new InvalidOperationException("csd merge");
+            }
+
+            if (FillRange("{0}% increased Rarity", 8, 12) != "(8\u201412)% increased Rarity" ||
+                FillRange("{0:+d} to Life", 5, 5) != "+(5) to Life")
+            {
+                throw new InvalidOperationException("csd range");
             }
         }
     }

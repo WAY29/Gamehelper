@@ -1281,18 +1281,18 @@ namespace StashUtilityPlus
                     continue;
                 }
 
-                if (!row.Id.StartsWith("Tower", StringComparison.Ordinal) &&
-                    !row.Id.StartsWith("Map", StringComparison.Ordinal))
+                if (!row.Id.StartsWith("Tower", StringComparison.Ordinal) ||
+                    row.Id.Contains("Implicit", StringComparison.Ordinal) ||
+                    string.IsNullOrEmpty(row.English))
                 {
                     continue;
                 }
 
-                var en = string.IsNullOrEmpty(row.English) ? row.Id : row.English;
                 named.Add(new ModInfo(
                     row.Id,
-                    en,
-                    string.IsNullOrEmpty(row.ZhCn) ? en : row.ZhCn,
-                    string.IsNullOrEmpty(row.ZhTw) ? en : row.ZhTw));
+                    row.English,
+                    string.IsNullOrEmpty(row.ZhCn) ? row.English : row.ZhCn,
+                    string.IsNullOrEmpty(row.ZhTw) ? row.English : row.ZhTw));
             }
 
             Mods = named.ToArray();

@@ -327,6 +327,7 @@ namespace GameHelper.Data
                 byte[] csdMain;
                 byte[] csdMap;
                 byte[] csdAtlas;
+                byte[] csdTablet;
                 byte[] itemsTwDat;
                 byte[] areasTwDat;
                 using (OpenIndex(path, out var index))
@@ -346,6 +347,7 @@ namespace GameHelper.Data
                     csdMain = TryReadDat(index, "Data/StatDescriptions/stat_descriptions.csd");
                     csdMap = TryReadDat(index, "Data/StatDescriptions/map_stat_descriptions.csd");
                     csdAtlas = TryReadDat(index, "Data/StatDescriptions/atlas_stat_descriptions.csd");
+                    csdTablet = TryReadDat(index, "Data/StatDescriptions/tablet_stat_descriptions.csd");
                 }
 
                 SetProgress(6, 8, "parse");
@@ -394,7 +396,7 @@ namespace GameHelper.Data
                     mods.Add(new CatalogMod { Id = family });
                 }
 
-                StatDescriptions.Apply(mods, modsDat, statsDat, csdMain, csdMap, csdAtlas);
+                StatDescriptions.Apply(mods, modsDat, statsDat, csdMain, csdMap, csdAtlas, csdTablet);
                 foreach (var mod in mods)
                 {
                     if (!string.IsNullOrEmpty(mod.English) || !TryModText(oldNames, mod.Id, out var text))
@@ -577,10 +579,20 @@ namespace GameHelper.Data
         {
             lock (Gate)
             {
-                lastError = MissingOo2Core(ex) ? "oo2core" : ex.Message;
+                lastError = MissingOo2Core(ex) ? "oo2core" : Innermost(ex);
             }
 
             Console.WriteLine($"[ItemCatalog] {ex}");
+        }
+
+        private static string Innermost(Exception ex)
+        {
+            while (ex.InnerException != null)
+            {
+                ex = ex.InnerException;
+            }
+
+            return ex.Message;
         }
 
         private static bool MissingOo2Core(Exception ex)

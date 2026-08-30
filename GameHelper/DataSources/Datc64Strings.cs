@@ -351,10 +351,10 @@ namespace GameHelper.Data
 
             OverlayItemZhTw(items, Utf16(
                 "Metadata/Items/Currency/CurrencyRerollRare",
-                "混沌石",
+                "Chaos Orb TW",
                 "Metadata/Items/Currency/StackableCurrency",
                 "X"));
-            if (items[0].ZhTw != "混沌石")
+            if (items[0].ZhTw != "Chaos Orb TW")
             {
                 throw new InvalidOperationException("datc64 zh-tw items");
             }
