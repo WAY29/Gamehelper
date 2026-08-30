@@ -43,8 +43,8 @@ namespace Atlas2
 
             var name = mode switch
             {
-                2 => loc.ZhCn,
-                3 => loc.ZhTw,
+                2 => FirstNonEmpty(loc.ZhCn, loc.ZhTw, loc.En),
+                3 => FirstNonEmpty(loc.ZhTw, loc.ZhCn, loc.En),
                 _ => loc.En,
             };
             return string.IsNullOrWhiteSpace(name) ? fallback : name;
@@ -117,7 +117,7 @@ namespace Atlas2
 
             foreach (var row in ItemCatalog.SnapshotAreas())
             {
-                if (string.IsNullOrEmpty(row.Id) || !row.Id.StartsWith("Map", StringComparison.Ordinal))
+                if (string.IsNullOrEmpty(row.Id) || WorldAreaTags.GetMeta(row.Id) == null)
                 {
                     continue;
                 }
@@ -158,6 +158,19 @@ namespace Atlas2
             {
                 byAny[name.Trim()] = loc;
             }
+        }
+
+        private static string FirstNonEmpty(params string[] parts)
+        {
+            foreach (var part in parts)
+            {
+                if (!string.IsNullOrWhiteSpace(part))
+                {
+                    return part;
+                }
+            }
+
+            return string.Empty;
         }
 
         private static void Add(HashSet<string> names, string value)
