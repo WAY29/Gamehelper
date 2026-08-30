@@ -8,6 +8,8 @@ namespace GameHelper.Settings
     using System.Collections.Generic;
     using System.Linq;
     using System.Numerics;
+    using System.Threading;
+    using System.Windows.Forms;
     using ClickableTransparentOverlay;
     using ClickableTransparentOverlay.Win32;
     using Coroutine;
@@ -485,6 +487,135 @@ namespace GameHelper.Settings
             ImGui.TextWrapped(L.T(
                 "settings.datasources.market.help",
                 "Prices are estimates from poe2scout / poe.ninja, not live trade listings."));
+
+            ImGui.Spacing();
+            DrawCatalogSettings();
+        }
+
+        private static void DrawCatalogSettings()
+        {
+            ImGuiTheme.SectionHeader(
+                L.T("settings.datasources.catalog.title", "Item Catalog"),
+                L.T(
+                    "settings.datasources.catalog.subtitle",
+                    "BaseItemTypes + Mods from Content.ggpk; names from poe2db.tw list pages."));
+
+            ItemCatalog.Touch();
+            var ggpk = Core.GHSettings.ContentGgpkPath ?? string.Empty;
+            if (string.IsNullOrEmpty(ggpk))
+            {
+                ImGui.TextDisabled(L.T("settings.datasources.catalog.ggpk_none", "No Content.ggpk selected"));
+            }
+            else
+            {
+                ImGui.TextWrapped(ggpk);
+            }
+
+            if (ImGui.Button(L.T("settings.datasources.catalog.browse", "Browse...")))
+            {
+                var picked = BrowseGgpk(ggpk);
+                if (!string.IsNullOrEmpty(picked))
+                {
+                    Core.GHSettings.ContentGgpkPath = picked;
+                }
+            }
+
+            var busy = ItemCatalog.IsExtracting || ItemCatalog.IsFetchingNames;
+            ImGui.BeginDisabled(busy);
+            if (ImGui.Button(L.T("settings.datasources.catalog.extract", "Extract GGPK")))
+            {
+                ItemCatalog.ExtractGgpk();
+            }
+
+            ImGui.SameLine();
+            if (ImGui.Button(L.T("settings.datasources.catalog.names", "Refresh names (poe2db)")))
+            {
+                ItemCatalog.RefreshNames();
+            }
+
+            ImGui.EndDisabled();
+
+            if (ItemCatalog.IsExtracting)
+            {
+                ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.2f, 1f), L.T("settings.datasources.catalog.extracting", "Extracting GGPK..."));
+            }
+            else if (ItemCatalog.IsFetchingNames)
+            {
+                ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.2f, 1f), L.T("settings.datasources.catalog.fetching", "Fetching poe2db names..."));
+            }
+
+            if (ItemCatalog.ExtractedUtc > DateTime.MinValue)
+            {
+                ImGui.TextColored(
+                    new Vector4(0.5f, 0.8f, 0.5f, 1f),
+                    L.F(
+                        "settings.datasources.catalog.ggpk_status",
+                        "{0} items, {1} mods | {2} | GGPK {3:yyyy-MM-dd}",
+                        ItemCatalog.ItemCount,
+                        ItemCatalog.ModCount,
+                        FormatAgo(ItemCatalog.ExtractedUtc),
+                        ItemCatalog.GgpkWriteUtc.ToLocalTime()));
+            }
+
+            if (ItemCatalog.NamesUtc > DateTime.MinValue)
+            {
+                ImGui.TextColored(
+                    new Vector4(0.5f, 0.8f, 0.5f, 1f),
+                    L.F(
+                        "settings.datasources.catalog.names_status",
+                        "{0} named | {1}",
+                        ItemCatalog.NamedCount,
+                        FormatAgo(ItemCatalog.NamesUtc)));
+            }
+
+            if (ItemCatalog.GgpkIsNewerThanCatalog)
+            {
+                ImGui.TextColored(
+                    new Vector4(0.95f, 0.75f, 0.3f, 1f),
+                    L.T("settings.datasources.catalog.stale", "Content.ggpk is newer than this catalog. Extract again."));
+            }
+
+            if (!string.IsNullOrEmpty(ItemCatalog.LastError))
+            {
+                ImGui.TextColored(new Vector4(0.95f, 0.45f, 0.35f, 1f), ItemCatalog.LastError);
+            }
+
+            ImGui.TextWrapped(L.T(
+                "settings.datasources.catalog.help",
+                "Needs oo2core.dll next to GameHelper.exe."));
+        }
+
+        private static string BrowseGgpk(string current)
+        {
+            var picked = string.Empty;
+            var thread = new Thread(() =>
+            {
+                using var dlg = new OpenFileDialog
+                {
+                    Title = "Content.ggpk",
+                    Filter = "Content.ggpk|Content.ggpk|GGPK (*.ggpk)|*.ggpk|All files (*.*)|*.*",
+                    FileName = string.IsNullOrEmpty(current) ? "Content.ggpk" : System.IO.Path.GetFileName(current),
+                    InitialDirectory = string.IsNullOrEmpty(current) ? string.Empty : System.IO.Path.GetDirectoryName(current),
+                    CheckFileExists = true,
+                };
+                if (dlg.ShowDialog() == DialogResult.OK)
+                {
+                    picked = dlg.FileName;
+                }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+            return picked;
+        }
+
+        private static string FormatAgo(DateTime utc)
+        {
+            var span = DateTime.UtcNow - utc;
+            if (span.TotalMinutes < 1) return L.T("settings.datasources.ago.just_now", "just now");
+            if (span.TotalHours < 1) return L.F("settings.datasources.ago.minutes", "{0} min ago", (int)span.TotalMinutes);
+            if (span.TotalDays < 1) return L.F("settings.datasources.ago.hours", "{0} h ago", (int)span.TotalHours);
+            return L.F("settings.datasources.ago.days", "{0} d ago", (int)span.TotalDays);
         }
 
         private static void DrawMarketLeagueSelector()

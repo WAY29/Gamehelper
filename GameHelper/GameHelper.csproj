@@ -13,6 +13,7 @@
     <FileVersion>1.4.15.0</FileVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <OutputType>Exe</OutputType>
@@ -50,9 +51,13 @@
     <None Include="Localization\*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="native\oo2core.dll" Link="oo2core.dll" Condition="Exists('$(MSBuildThisFileDirectory)native\oo2core.dll')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GameOffsets\GameOffsets.csproj" />
+    <ProjectReference Include="..\third_party\LibGGPK3\LibBundledGGPK3\LibBundledGGPK3.csproj" />
   </ItemGroup>
   <Target Name="DeleteDebugSymbolFiles" AfterTargets="Build" Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <Delete Files="$(OutDir)GameHelper.xml;$(OutDir)GameHelper.runtimeconfig.dev.json;$(OutDir)GameOffsets.pdb;" />

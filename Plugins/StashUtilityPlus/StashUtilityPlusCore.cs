@@ -6,6 +6,7 @@ namespace StashUtilityPlus
     using System.Numerics;
     using System.Reflection;
     using GameHelper;
+    using GameHelper.Data;
     using GameHelper.Localization;
     using GameHelper.Plugin;
     using GameHelper.RemoteEnums;
@@ -1268,6 +1269,52 @@ namespace StashUtilityPlus
             if (Tablets.Length == 0)
             {
                 throw new InvalidOperationException("tablets.json");
+            }
+
+            OverlayFromItemCatalog();
+        }
+
+        private static void OverlayFromItemCatalog()
+        {
+            ItemCatalog.Touch();
+            var named = new List<ModInfo>();
+            foreach (var row in ItemCatalog.SnapshotMods())
+            {
+                if (string.IsNullOrEmpty(row.Id) || string.IsNullOrEmpty(row.English))
+                {
+                    continue;
+                }
+
+                named.Add(new ModInfo(
+                    row.Id,
+                    row.English,
+                    string.IsNullOrEmpty(row.ZhCn) ? row.English : row.ZhCn,
+                    string.IsNullOrEmpty(row.ZhTw) ? row.English : row.ZhTw));
+            }
+
+            if (named.Count > 0)
+            {
+                Mods = named.ToArray();
+            }
+
+            var tablets = new List<ModInfo>();
+            foreach (var row in ItemCatalog.ItemsWherePathContains("/TowerAugment/"))
+            {
+                if (string.IsNullOrEmpty(row.InternalName) || string.IsNullOrEmpty(row.English))
+                {
+                    continue;
+                }
+
+                tablets.Add(new ModInfo(
+                    row.InternalName,
+                    row.English,
+                    string.IsNullOrEmpty(row.ZhCn) ? row.English : row.ZhCn,
+                    string.IsNullOrEmpty(row.ZhTw) ? row.English : row.ZhTw));
+            }
+
+            if (tablets.Count > 0)
+            {
+                Tablets = tablets.ToArray();
             }
         }
 

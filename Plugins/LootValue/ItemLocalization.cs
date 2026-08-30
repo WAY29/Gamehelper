@@ -3,6 +3,7 @@ namespace LootValue
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using GameHelper.Data;
     using Newtonsoft.Json;
 
     /// <summary>
@@ -22,20 +23,29 @@ namespace LootValue
             ToEnglish.Clear();
 
             var path = Path.Combine(pluginDirectory, "item-localization.json");
-            if (!File.Exists(path)) return;
-
-            Dictionary<string, Locale>? items;
-            try
+            Dictionary<string, Locale> items = new();
+            if (File.Exists(path))
             {
-                items = JsonConvert.DeserializeObject<Dictionary<string, Locale>>(File.ReadAllText(path));
+                try
+                {
+                    items = JsonConvert.DeserializeObject<Dictionary<string, Locale>>(File.ReadAllText(path))
+                        ?? new Dictionary<string, Locale>();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[LootValue] Failed to load item-localization.json: {ex.Message}");
+                }
             }
-            catch (Exception ex)
+            ItemCatalog.Touch();
+            foreach (var row in ItemCatalog.ItemsWherePathContains("Metadata/Items/"))
             {
-                Console.WriteLine($"[LootValue] Failed to load item-localization.json: {ex.Message}");
-                return;
+                if (string.IsNullOrWhiteSpace(row.English)) continue;
+                if (!items.ContainsKey(row.English) &&
+                    (!string.IsNullOrWhiteSpace(row.ZhCn) || !string.IsNullOrWhiteSpace(row.ZhTw)))
+                {
+                    items[row.English] = new Locale { ZhCn = row.ZhCn, ZhTw = row.ZhTw };
+                }
             }
-
-            if (items == null) return;
 
             foreach (var (english, loc) in items)
             {
@@ -71,7 +81,8 @@ namespace LootValue
         public static string ResolveEnglish(string name)
         {
             if (string.IsNullOrWhiteSpace(name)) return name;
-            return ToEnglish.TryGetValue(name.Trim(), out var english) ? english : name;
+            if (ToEnglish.TryGetValue(name.Trim(), out var english)) return english;
+            return ItemCatalog.ResolveEnglish(name);
         }
 
         public static IEnumerable<string> NamesFor(string? englishName, string? localizedBase)

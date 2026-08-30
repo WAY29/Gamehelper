@@ -323,5 +323,10 @@ namespace GameHelper.Settings
         ///     Automatic market price refresh interval in minutes.
         /// </summary>
         public int MarketRefreshMinutes = 5;
+
+        /// <summary>
+        ///     Path to PoE2 Content.ggpk used to refresh the item catalog.
+        /// </summary>
+        public string ContentGgpkPath = string.Empty;
     }
 }

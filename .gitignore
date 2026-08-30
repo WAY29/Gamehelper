@@ -68,6 +68,10 @@ Plugins/**/Textdokument*.txt
 player_status_effect.txt
 **/player_status_effect.txt
 
+# Oodle (not redistributable) and local GGPK extracts
+GameHelper/native/oo2core.dll
+tmp-ggpk/
+
 # Secrets
 *.token
 .env

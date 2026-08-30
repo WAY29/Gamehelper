@@ -3,6 +3,7 @@ namespace ItemCrafter
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using GameHelper.Data;
     using GameHelper.RemoteEnums;
     using Newtonsoft.Json;
 
@@ -99,6 +100,79 @@ namespace ItemCrafter
             if (Mods.Length == 0)
             {
                 throw new InvalidOperationException("tablet-mods.json");
+            }
+
+            OverlayFromItemCatalog();
+        }
+
+        private static void OverlayFromItemCatalog()
+        {
+            ItemCatalog.Touch();
+            var tablets = new List<TargetInfo>();
+            foreach (var row in ItemCatalog.ItemsWherePathContains("/TowerAugment/"))
+            {
+                if (string.IsNullOrEmpty(row.InternalName) || string.IsNullOrEmpty(row.English))
+                {
+                    continue;
+                }
+
+                tablets.Add(new TargetInfo(
+                    row.InternalName,
+                    row.English,
+                    string.IsNullOrEmpty(row.ZhCn) ? row.English : row.ZhCn,
+                    string.IsNullOrEmpty(row.ZhTw) ? row.English : row.ZhTw));
+            }
+
+            ItemCatalog.TryGet(DefaultTarget, out var waystone);
+            if (tablets.Count == 0 && waystone == null)
+            {
+                return;
+            }
+
+            var current = Array.Find(Targets, t => t.Id.Equals(DefaultTarget, StringComparison.OrdinalIgnoreCase));
+            var map = waystone == null
+                ? current
+                : new TargetInfo(
+                    waystone.InternalName,
+                    string.IsNullOrEmpty(waystone.English) ? current.English : waystone.English,
+                    string.IsNullOrEmpty(waystone.ZhCn) ? current.ZhCN : waystone.ZhCn,
+                    string.IsNullOrEmpty(waystone.ZhTw) ? current.ZhTW : waystone.ZhTw);
+            var next = new List<TargetInfo> { map };
+            if (tablets.Count == 0)
+            {
+                foreach (var t in Targets)
+                {
+                    if (!t.Id.Equals(DefaultTarget, StringComparison.OrdinalIgnoreCase))
+                    {
+                        next.Add(t);
+                    }
+                }
+            }
+            else
+            {
+                next.AddRange(tablets);
+            }
+
+            Targets = next.ToArray();
+
+            var namedMods = new List<ModInfo>();
+            foreach (var row in ItemCatalog.SnapshotMods())
+            {
+                if (string.IsNullOrEmpty(row.Id) || string.IsNullOrEmpty(row.English))
+                {
+                    continue;
+                }
+
+                namedMods.Add(new ModInfo(
+                    row.Id,
+                    row.English,
+                    string.IsNullOrEmpty(row.ZhCn) ? row.English : row.ZhCn,
+                    string.IsNullOrEmpty(row.ZhTw) ? row.English : row.ZhTw));
+            }
+
+            if (namedMods.Count > 0)
+            {
+                Mods = namedMods.ToArray();
             }
         }
 
