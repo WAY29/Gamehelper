@@ -10,11 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Update="tablet-mods.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Update="tablets.json" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\GameHelper\GameHelper.csproj">
       <Private>false</Private>
       <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
@@ -27,7 +22,7 @@
 
   <Target Name="CopyFiles" AfterTargets="Build">
     <ItemGroup>
-      <_Deploy Include="$(OutDir)$(TargetName)$(TargetExt);$(OutDir)$(TargetName).pdb;$(OutDir)tablet-mods.json;$(OutDir)tablets.json" />
+      <_Deploy Include="$(OutDir)$(TargetName)$(TargetExt);$(OutDir)$(TargetName).pdb" />
     </ItemGroup>
     <Copy SourceFiles="@(_Deploy)"
           DestinationFolder="..\..\GameHelper\$(OutDir)Plugins\$(ProjectName)"

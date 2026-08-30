@@ -10,12 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Update="item-localization.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\GameHelper\GameHelper.csproj">
       <Private>false</Private>
       <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
@@ -25,7 +19,6 @@
   <Target Name="CopyFiles" AfterTargets="Build">
     <ItemGroup>
       <_LootValueDeployFiles Include="$(OutDir)$(TargetName)$(TargetExt)" />
-      <_LootValueDeployFiles Include="$(OutDir)item-localization.json" Condition="Exists('$(OutDir)item-localization.json')" />
     </ItemGroup>
     <Copy SourceFiles="@(_LootValueDeployFiles)"
           DestinationFolder="..\..\GameHelper\$(OutDir)Plugins\$(ProjectName)"

@@ -2,64 +2,28 @@ namespace Atlas2
 {
     using System;
     using System.Collections.Generic;
-    using System.IO;
+    using GameHelper.Data;
     using GameHelper.Localization;
     using GameHelper.Utils;
-    using Newtonsoft.Json;
 
     internal static class AreaLocalization
     {
         private static Dictionary<string, Locale> byId = new(StringComparer.OrdinalIgnoreCase);
         private static Dictionary<string, Locale> byAny = new(StringComparer.OrdinalIgnoreCase);
         private static List<(string English, string Display)> uniqueNames = [];
+        private static DateTime loadedExtracted;
+        private static DateTime loadedNames;
         private static int uniqueLang = int.MinValue;
         private static OverlayLanguage uniqueOverlay;
 
         public static void Load(string pluginDirectory)
         {
-            byId = new Dictionary<string, Locale>(StringComparer.OrdinalIgnoreCase);
-            byAny = new Dictionary<string, Locale>(StringComparer.OrdinalIgnoreCase);
-            uniqueNames = [];
-            uniqueLang = int.MinValue;
-            var path = Path.Combine(pluginDirectory, "json", "area-localization.json");
-            if (!File.Exists(path))
-            {
-                return;
-            }
-
-            try
-            {
-                var items = JsonConvert.DeserializeObject<Dictionary<string, Locale>>(File.ReadAllText(path));
-                if (items == null)
-                {
-                    return;
-                }
-
-                foreach (var kv in items)
-                {
-                    var loc = kv.Value ?? new Locale();
-                    var english = WorldAreaNames.GetDisplayName(kv.Key);
-                    if (!string.IsNullOrEmpty(english) &&
-                        !english.Equals(kv.Key, StringComparison.OrdinalIgnoreCase))
-                    {
-                        loc.En = english;
-                    }
-
-                    byId[kv.Key] = loc;
-                    Link(kv.Key, loc);
-                    Link(loc.En, loc);
-                    Link(loc.ZhCn, loc);
-                    Link(loc.ZhTw, loc);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Atlas2] Failed to load area-localization.json: {ex.Message}");
-            }
+            Reload(force: true);
         }
 
         public static string DisplayName(string mapIdOrEnglish, string fallback, int language)
         {
+            Reload(force: false);
             var loc = Resolve(mapIdOrEnglish) ?? Resolve(fallback);
             if (loc == null)
             {
@@ -88,6 +52,7 @@ namespace Atlas2
 
         public static IReadOnlyList<(string English, string Display)> UniqueNames(int language)
         {
+            Reload(force: false);
             var overlay = OverlayLocalization.CurrentLanguage;
             if (uniqueNames.Count > 0 && uniqueLang == language && uniqueOverlay == overlay)
             {
@@ -115,6 +80,7 @@ namespace Atlas2
 
         public static IEnumerable<string> Aliases(string mapId, string fallback)
         {
+            Reload(force: false);
             var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             Add(names, mapId);
             Add(names, fallback);
@@ -129,6 +95,45 @@ namespace Atlas2
             }
 
             return names;
+        }
+
+        private static void Reload(bool force)
+        {
+            ItemCatalog.Touch();
+            if (!force &&
+                loadedExtracted == ItemCatalog.ExtractedUtc &&
+                loadedNames == ItemCatalog.NamesUtc &&
+                byId.Count > 0)
+            {
+                return;
+            }
+
+            loadedExtracted = ItemCatalog.ExtractedUtc;
+            loadedNames = ItemCatalog.NamesUtc;
+            byId = new Dictionary<string, Locale>(StringComparer.OrdinalIgnoreCase);
+            byAny = new Dictionary<string, Locale>(StringComparer.OrdinalIgnoreCase);
+            uniqueNames = [];
+            uniqueLang = int.MinValue;
+
+            foreach (var row in ItemCatalog.SnapshotAreas())
+            {
+                if (string.IsNullOrEmpty(row.Id) || !row.Id.StartsWith("Map", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var loc = new Locale
+                {
+                    En = string.IsNullOrEmpty(row.English) ? WorldAreaNames.GetDisplayName(row.Id) : row.English,
+                    ZhCn = row.ZhCn ?? string.Empty,
+                    ZhTw = row.ZhTw ?? string.Empty,
+                };
+                byId[row.Id] = loc;
+                Link(row.Id, loc);
+                Link(loc.En, loc);
+                Link(loc.ZhCn, loc);
+                Link(loc.ZhTw, loc);
+            }
         }
 
         private static Locale Resolve(string key)
@@ -166,11 +171,7 @@ namespace Atlas2
         private sealed class Locale
         {
             public string En { get; set; } = string.Empty;
-
-            [JsonProperty("zh_CN")]
             public string ZhCn { get; set; } = string.Empty;
-
-            [JsonProperty("zh_TW")]
             public string ZhTw { get; set; } = string.Empty;
         }
     }

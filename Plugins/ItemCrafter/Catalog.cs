@@ -2,10 +2,8 @@ namespace ItemCrafter
 {
     using System;
     using System.Collections.Generic;
-    using System.IO;
     using GameHelper.Data;
     using GameHelper.RemoteEnums;
-    using Newtonsoft.Json;
 
     internal enum StepKind
     {
@@ -44,71 +42,25 @@ namespace ItemCrafter
 
         public static ModInfo[] Mods { get; private set; } = [];
 
-        private sealed class WaystoneRow
-        {
-            public string id = "";
-            public string en = "";
-            public string zh_CN = "";
-            public string zh_TW = "";
-        }
-
         public static void Load(string directory)
         {
-            var path = Path.Join(directory, "waystones.json");
-            var rows = JsonConvert.DeserializeObject<List<WaystoneRow>>(File.ReadAllText(path))
-                ?? throw new InvalidOperationException("waystones.json");
-            if (rows.Count == 0 || rows.TrueForAll(r => r.id != DefaultTarget))
-            {
-                throw new InvalidOperationException("waystones.json");
-            }
-
-            var loaded = rows.ConvertAll(r => new TargetInfo(
-                r.id,
-                r.en,
-                string.IsNullOrEmpty(r.zh_CN) ? r.en : r.zh_CN,
-                string.IsNullOrEmpty(r.zh_TW) ? r.en : r.zh_TW));
-            var targets = loaded.FindAll(t => t.Id.Equals(DefaultTarget, StringComparison.OrdinalIgnoreCase));
-            if (targets.Count == 0)
-            {
-                throw new InvalidOperationException("waystones.json");
-            }
-
-            var tabletItems = JsonConvert.DeserializeObject<List<WaystoneRow>>(File.ReadAllText(Path.Join(directory, "tablets.json")))
-                ?? throw new InvalidOperationException("tablets.json");
-            if (tabletItems.Count == 0 || tabletItems.Exists(r => string.IsNullOrEmpty(r.id) || string.IsNullOrEmpty(r.en)))
-            {
-                throw new InvalidOperationException("tablets.json");
-            }
-
-            targets.AddRange(tabletItems.ConvertAll(r => new TargetInfo(
-                r.id,
-                r.en,
-                string.IsNullOrEmpty(r.zh_CN) ? r.en : r.zh_CN,
-                string.IsNullOrEmpty(r.zh_TW) ? r.en : r.zh_TW)));
-            Targets = targets.ToArray();
-
-            var en = ReadLoc(directory, "en-US");
-            var cn = ReadLoc(directory, "zh-CN");
-            var tw = ReadLoc(directory, "zh-Hant");
-            var tablets = JsonConvert.DeserializeObject<List<WaystoneRow>>(File.ReadAllText(Path.Join(directory, "tablet-mods.json")))
-                ?? throw new InvalidOperationException("tablet-mods.json");
-            Mods = tablets.ConvertAll(r => new ModInfo(
-                r.id,
-                Loc(en, r.id, r.en),
-                Loc(cn, r.id, r.en),
-                Loc(tw, r.id, r.en))).ToArray();
-            if (Mods.Length == 0)
-            {
-                throw new InvalidOperationException("tablet-mods.json");
-            }
-
             OverlayFromItemCatalog();
         }
 
         private static void OverlayFromItemCatalog()
         {
             ItemCatalog.Touch();
-            var tablets = new List<TargetInfo>();
+            var map = new TargetInfo(DefaultTarget, "Waystone (Tier 15)", "Waystone (Tier 15)", "Waystone (Tier 15)");
+            if (ItemCatalog.TryGet(DefaultTarget, out var waystone) && waystone != null)
+            {
+                map = new TargetInfo(
+                    waystone.InternalName,
+                    string.IsNullOrEmpty(waystone.English) ? map.English : waystone.English,
+                    string.IsNullOrEmpty(waystone.ZhCn) ? map.ZhCN : waystone.ZhCn,
+                    string.IsNullOrEmpty(waystone.ZhTw) ? map.ZhTW : waystone.ZhTw);
+            }
+
+            var next = new List<TargetInfo> { map };
             foreach (var row in ItemCatalog.ItemsWherePathContains("/TowerAugment/"))
             {
                 if (string.IsNullOrEmpty(row.InternalName) || string.IsNullOrEmpty(row.English))
@@ -116,41 +68,11 @@ namespace ItemCrafter
                     continue;
                 }
 
-                tablets.Add(new TargetInfo(
+                next.Add(new TargetInfo(
                     row.InternalName,
                     row.English,
                     string.IsNullOrEmpty(row.ZhCn) ? row.English : row.ZhCn,
                     string.IsNullOrEmpty(row.ZhTw) ? row.English : row.ZhTw));
-            }
-
-            ItemCatalog.TryGet(DefaultTarget, out var waystone);
-            if (tablets.Count == 0 && waystone == null)
-            {
-                return;
-            }
-
-            var current = Array.Find(Targets, t => t.Id.Equals(DefaultTarget, StringComparison.OrdinalIgnoreCase));
-            var map = waystone == null
-                ? current
-                : new TargetInfo(
-                    waystone.InternalName,
-                    string.IsNullOrEmpty(waystone.English) ? current.English : waystone.English,
-                    string.IsNullOrEmpty(waystone.ZhCn) ? current.ZhCN : waystone.ZhCn,
-                    string.IsNullOrEmpty(waystone.ZhTw) ? current.ZhTW : waystone.ZhTw);
-            var next = new List<TargetInfo> { map };
-            if (tablets.Count == 0)
-            {
-                foreach (var t in Targets)
-                {
-                    if (!t.Id.Equals(DefaultTarget, StringComparison.OrdinalIgnoreCase))
-                    {
-                        next.Add(t);
-                    }
-                }
-            }
-            else
-            {
-                next.AddRange(tablets);
             }
 
             Targets = next.ToArray();
@@ -170,26 +92,8 @@ namespace ItemCrafter
                     string.IsNullOrEmpty(row.ZhTw) ? row.English : row.ZhTw));
             }
 
-            if (namedMods.Count > 0)
-            {
-                Mods = namedMods.ToArray();
-            }
+            Mods = namedMods.ToArray();
         }
-
-        private static Dictionary<string, string> ReadLoc(string directory, string lang)
-        {
-            var path = Path.Join(directory, "Localization", lang + ".json");
-            if (!File.Exists(path))
-            {
-                return new Dictionary<string, string>(StringComparer.Ordinal);
-            }
-
-            return JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(path))
-                ?? new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        private static string Loc(Dictionary<string, string> map, string id, string fallback) =>
-            map.TryGetValue("mod." + id, out var value) && !string.IsNullOrEmpty(value) ? value : fallback;
 
         public static string PickName(string en, string zhcn, string zhtw, int language, bool overlayZhHant, bool overlayZh)
         {
@@ -655,7 +559,9 @@ namespace ItemCrafter
                 !MatchesConds(["Foo", "Bar"], new CraftExpr { Items = { new() { Mod = "Foo" }, new() { All = false, Items = { new() { Mod = "Bar" }, new() { Mod = "Baz" } } } } }, false) ||
                 !MatchesConds(["TowerDroppedItemRarityIncrease3"], new CraftExpr { Mod = "TowerDroppedItemRarityIncrease" }, false) ||
                 MatchesConds(["TowerAdditionalEssenceChance"], new CraftExpr { Mod = "TowerAdditionalEssence" }, false) ||
-                !MatchesConds(["TowerDroppedItemRarityIncrease3"], new CraftExpr { Mod = "稀有度" }, false) ||
+                (TryCatalog("TowerDroppedItemRarityIncrease3", out var rarityMod) &&
+                    !string.IsNullOrEmpty(rarityMod.ZhCN) &&
+                    !MatchesConds(["TowerDroppedItemRarityIncrease3"], new CraftExpr { Mod = "稀有度" }, false)) ||
                 MatchesConds(["TowerDroppedItemRarityIncrease3"], new CraftExpr { Mod = "TowerDropped" }, false) ||
                 MatchesConds(["Foo"], new CraftExpr { Mod = "Foo", Not = true }, false) ||
                 !MatchesConds(["Bar"], new CraftExpr { Mod = "Foo", Not = true }, false) ||

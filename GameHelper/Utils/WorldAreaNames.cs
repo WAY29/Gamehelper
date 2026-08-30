@@ -9,6 +9,7 @@ namespace GameHelper.Utils
     using System.IO;
     using System.Linq;
     using System.Reflection;
+    using GameHelper.Data;
 
     /// <summary>
     ///     Maps internal WorldArea ids (e.g. "MapHiddenGrotto", "G1_1") to their
@@ -40,6 +41,13 @@ namespace GameHelper.Utils
             if (string.IsNullOrEmpty(internalId))
             {
                 return internalId;
+            }
+
+            if (ItemCatalog.TryGetArea(internalId, out var area) &&
+                area != null &&
+                !string.IsNullOrEmpty(area.English))
+            {
+                return area.English;
             }
 
             return Map.Value.TryGetValue(internalId, out var name) ? name : internalId;

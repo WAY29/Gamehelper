@@ -53,14 +53,6 @@ namespace StashUtilityPlus
         private static ModInfo[] Mods { get; set; } = [];
         private static ModInfo[] Tablets { get; set; } = [];
 
-        private sealed class JsonRow
-        {
-            public string id = "";
-            public string en = "";
-            public string zh_CN = "";
-            public string zh_TW = "";
-        }
-
         [Flags]
         private enum HighSlot
         {
@@ -1244,33 +1236,6 @@ namespace StashUtilityPlus
 
         private static void LoadMods(string directory)
         {
-            var en = ReadLoc(directory, "en-US");
-            var cn = ReadLoc(directory, "zh-CN");
-            var tw = ReadLoc(directory, "zh-Hant");
-            var rows = JsonConvert.DeserializeObject<List<JsonRow>>(File.ReadAllText(Path.Join(directory, "tablet-mods.json")))
-                ?? throw new InvalidOperationException("tablet-mods.json");
-            Mods = rows.ConvertAll(r => new ModInfo(
-                r.id,
-                Loc(en, "mod." + r.id, r.en),
-                Loc(cn, "mod." + r.id, r.en),
-                Loc(tw, "mod." + r.id, r.en))).ToArray();
-            if (Mods.Length == 0)
-            {
-                throw new InvalidOperationException("tablet-mods.json");
-            }
-
-            var tablets = JsonConvert.DeserializeObject<List<JsonRow>>(File.ReadAllText(Path.Join(directory, "tablets.json")))
-                ?? throw new InvalidOperationException("tablets.json");
-            Tablets = tablets.ConvertAll(r => new ModInfo(
-                r.id,
-                Loc(en, "type." + r.id, r.en),
-                Loc(cn, "type." + r.id, string.IsNullOrEmpty(r.zh_CN) ? r.en : r.zh_CN),
-                Loc(tw, "type." + r.id, string.IsNullOrEmpty(r.zh_TW) ? r.en : r.zh_TW))).ToArray();
-            if (Tablets.Length == 0)
-            {
-                throw new InvalidOperationException("tablets.json");
-            }
-
             OverlayFromItemCatalog();
         }
 
@@ -1292,10 +1257,7 @@ namespace StashUtilityPlus
                     string.IsNullOrEmpty(row.ZhTw) ? row.English : row.ZhTw));
             }
 
-            if (named.Count > 0)
-            {
-                Mods = named.ToArray();
-            }
+            Mods = named.ToArray();
 
             var tablets = new List<ModInfo>();
             foreach (var row in ItemCatalog.ItemsWherePathContains("/TowerAugment/"))
@@ -1312,26 +1274,8 @@ namespace StashUtilityPlus
                     string.IsNullOrEmpty(row.ZhTw) ? row.English : row.ZhTw));
             }
 
-            if (tablets.Count > 0)
-            {
-                Tablets = tablets.ToArray();
-            }
+            Tablets = tablets.ToArray();
         }
-
-        private static Dictionary<string, string> ReadLoc(string directory, string lang)
-        {
-            var path = Path.Join(directory, "Localization", lang + ".json");
-            if (!File.Exists(path))
-            {
-                return new Dictionary<string, string>(StringComparer.Ordinal);
-            }
-
-            return JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(path))
-                ?? new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        private static string Loc(Dictionary<string, string> map, string key, string fallback) =>
-            map.TryGetValue(key, out var value) && !string.IsNullOrEmpty(value) ? value : fallback;
 
         private static string PickName(string en, string zhcn, string zhtw, int language, bool overlayZhHant, bool overlayZh) =>
             language switch

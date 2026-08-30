@@ -41,7 +41,6 @@ namespace RitualHelper
         private MethodInfo? readStdWStringMethod;
         private object? handleObj;
         private bool wasRitualWindowOpen;
-        private Dictionary<string, string>? customNamesCache;
         private bool iconsReloadPending;
         private int? pendingSoundPlayback;
         private readonly List<PriceLabelDraw> cachedPriceLabels = new();
@@ -749,25 +748,6 @@ namespace RitualHelper
             return spaced.Trim();
         }
 
-        private void EnsureNameCache()
-        {
-            if (this.customNamesCache != null) return;
-
-            var dictionaryPath = Path.Combine(this.DllDirectory, "item_names.json");
-            if (File.Exists(dictionaryPath))
-            {
-                try
-                {
-                    this.customNamesCache = JsonConvert.DeserializeObject<Dictionary<string, string>>(File.ReadAllText(dictionaryPath))
-                        ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    return;
-                }
-                catch { }
-            }
-
-            this.customNamesCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        }
-
         private static bool TrySplitRuneforgeSuffix(string internalName, out string baseInternalName, out string suffix)
         {
             baseInternalName = internalName;
@@ -800,12 +780,14 @@ namespace RitualHelper
         private string GetPrettyName(string internalName, out bool isMapped)
         {
             isMapped = false;
-            this.EnsureNameCache();
             TrySplitRuneforgeSuffix(internalName, out var baseInternalName, out var suffix);
 
-            if (this.customNamesCache!.TryGetValue(baseInternalName, out var pretty))
+            if (ItemCatalog.TryGet(baseInternalName, out var catalogItem) &&
+                catalogItem != null &&
+                !string.IsNullOrEmpty(catalogItem.English))
             {
                 isMapped = true;
+                var pretty = catalogItem.English;
                 return string.IsNullOrEmpty(suffix) ? pretty : $"{pretty} {suffix}";
             }
 

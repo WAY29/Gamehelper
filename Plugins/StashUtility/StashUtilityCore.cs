@@ -76,10 +76,26 @@ namespace StashUtility
         private Item lastHoveredWaystone = null;
         private bool freezeHoveredWaystone = false;
 
+        private DateTime lastCatalogExtracted;
+        private DateTime lastCatalogNames;
         private string SettingPathname => Path.Combine(DllDirectory, "config", "settings.txt");
 
         public override void OnDisable()
         {
+        }
+
+        private void SyncCatalogMods()
+        {
+            GameHelper.Data.ItemCatalog.Touch();
+            if (this.lastCatalogExtracted == GameHelper.Data.ItemCatalog.ExtractedUtc &&
+                this.lastCatalogNames == GameHelper.Data.ItemCatalog.NamesUtc)
+            {
+                return;
+            }
+
+            this.lastCatalogExtracted = GameHelper.Data.ItemCatalog.ExtractedUtc;
+            this.lastCatalogNames = GameHelper.Data.ItemCatalog.NamesUtc;
+            Data.ModDatabase.RefreshFromCatalog();
         }
 
         public override void OnEnable(bool isGameOpened)
@@ -102,6 +118,8 @@ namespace StashUtility
             {
                 Settings.ScanEndOffset = 0x600;
             }
+
+            this.SyncCatalogMods();
 
             // Migration code: Convert old text patterns to new mod database IDs
             if (Settings.BadModPatterns.Count > 0)
@@ -192,6 +210,7 @@ namespace StashUtility
 
         public override void DrawSettings()
         {
+            this.SyncCatalogMods();
             var affixLang = Math.Clamp(this.Settings.AffixLanguage, 0, 3);
             var affixLangNames = new[]
             {
@@ -1000,6 +1019,7 @@ namespace StashUtility
 
         public override void DrawUI()
         {
+            this.SyncCatalogMods();
             if (!Settings.EnableWaystoneManager && !Settings.EnableTabletManager && !Settings.EnableDebugProbe && !Settings.EnableMerchantPurchasePanel) return;
 
             if (!Settings.ShowOverlayInBackground && !Core.Process.Foreground)

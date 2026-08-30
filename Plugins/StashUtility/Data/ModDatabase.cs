@@ -1,11 +1,14 @@
+using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
+using GameHelper.Data;
 using StashUtility.Models;
 
 namespace StashUtility.Data
 {
     public static class ModDatabase
     {
-        public static readonly List<WaystoneMod> AllWaystoneMods = new()
+        private static readonly List<WaystoneMod> SeedWaystones = new()
         {
              new WaystoneMod("MapMonsterDamageAsFire", "Monsters deal % of Damage as Extra Fire") { MonsterEffectiveness = 16, WaystoneDropChance = 15 },
              new WaystoneMod("MapMonsterDamageAsCold", "Monsters deal % of Damage as Extra Cold") { ItemRarity = 14, WaystoneDropChance = 15 },
@@ -43,7 +46,7 @@ namespace StashUtility.Data
              new WaystoneMod("MapMonstersCurseEffectOnSelf", "% less effect of Curses on Monsters") { ItemRarity = 10, WaystoneDropChance = 10 },
         };
 
-        public static readonly List<TabletMod> AllTabletMods = new()
+        private static readonly List<TabletMod> SeedTablets = new()
         {
             new TabletMod("TowerDroppedItemRarityIncrease", "% increased Rarity of Items found in Map") { MinRoll = 8, MaxRoll = 12 },
             new TabletMod("TowerAdditionalStoneCircle", "Map contains an additional Summoning Circle") { MinRoll = 1, MaxRoll = 1 },
@@ -129,5 +132,143 @@ namespace StashUtility.Data
             new TabletMod("TowerExpeditionArtifactIncrease", "% increased quantity of Expedition Artifacts dropped by Monsters in Map"),
             new TabletMod("TowerBreachMonsterQuantity", "Breaches in Map have % increased Pack Size"),
         };
+
+        public static List<WaystoneMod> AllWaystoneMods { get; private set; } = SeedWaystones;
+
+        public static List<TabletMod> AllTabletMods { get; private set; } = SeedTablets;
+
+        private static readonly Regex RollRange = new(
+            @"\((\d+)\s*[\u2014\u2013\-]\s*(\d+)\)",
+            RegexOptions.Compiled);
+
+        public static void RefreshFromCatalog()
+        {
+            ItemCatalog.Touch();
+            var rows = ItemCatalog.SnapshotMods();
+            if (rows.Count == 0)
+            {
+                AllWaystoneMods = SeedWaystones;
+                AllTabletMods = SeedTablets;
+                return;
+            }
+
+            var seedTabs = new Dictionary<string, TabletMod>(StringComparer.OrdinalIgnoreCase);
+            foreach (var seed in SeedTablets)
+            {
+                seedTabs[seed.Id] = seed;
+            }
+
+            var tablets = new List<TabletMod>();
+            var tabletIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in rows)
+            {
+                if (string.IsNullOrEmpty(row.Id) || !row.Id.StartsWith("Tower", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var name = string.IsNullOrEmpty(row.English) ? row.Id : row.English;
+                if (string.IsNullOrEmpty(row.English) && seedTabs.TryGetValue(row.Id, out var seedNamed))
+                {
+                    name = seedNamed.Name;
+                }
+
+                if (string.IsNullOrEmpty(row.English) && !seedTabs.ContainsKey(row.Id))
+                {
+                    continue;
+                }
+
+                var tab = new TabletMod(row.Id, name);
+                if (TryParseRolls(row.English, out var min, out var max) ||
+                    TryParseRolls(row.ZhCn, out min, out max))
+                {
+                    tab.MinRoll = min;
+                    tab.MaxRoll = max;
+                }
+                else if (seedTabs.TryGetValue(row.Id, out var seed))
+                {
+                    tab.MinRoll = seed.MinRoll;
+                    tab.MaxRoll = seed.MaxRoll;
+                }
+
+                tablets.Add(tab);
+                tabletIds.Add(row.Id);
+            }
+
+            foreach (var seed in SeedTablets)
+            {
+                if (tabletIds.Add(seed.Id))
+                {
+                    tablets.Add(seed);
+                }
+            }
+
+            AllTabletMods = tablets.Count > 0 ? tablets : SeedTablets;
+
+            var catalogById = new Dictionary<string, CatalogMod>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in rows)
+            {
+                if (!string.IsNullOrEmpty(row.Id))
+                {
+                    catalogById[row.Id] = row;
+                }
+            }
+
+            var ways = new List<WaystoneMod>();
+            var wayIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var seed in SeedWaystones)
+            {
+                var name = seed.Name;
+                if (catalogById.TryGetValue(seed.Id, out var cat) && !string.IsNullOrEmpty(cat.English))
+                {
+                    name = cat.English;
+                }
+
+                ways.Add(new WaystoneMod(seed.Id, name)
+                {
+                    ItemRarity = seed.ItemRarity,
+                    PackSize = seed.PackSize,
+                    MonsterRarity = seed.MonsterRarity,
+                    MonsterEffectiveness = seed.MonsterEffectiveness,
+                    WaystoneDropChance = seed.WaystoneDropChance,
+                });
+                wayIds.Add(seed.Id);
+            }
+
+            foreach (var row in rows)
+            {
+                if (string.IsNullOrEmpty(row.Id) ||
+                    string.IsNullOrEmpty(row.English) ||
+                    !row.Id.StartsWith("Map", StringComparison.Ordinal) ||
+                    !wayIds.Add(row.Id))
+                {
+                    continue;
+                }
+
+                ways.Add(new WaystoneMod(row.Id, row.English));
+            }
+
+            AllWaystoneMods = ways;
+        }
+
+        private static bool TryParseRolls(string text, out float min, out float max)
+        {
+            min = 0;
+            max = 0;
+            if (string.IsNullOrEmpty(text))
+            {
+                return false;
+            }
+
+            var m = RollRange.Match(text);
+            if (!m.Success)
+            {
+                return false;
+            }
+
+            min = float.Parse(m.Groups[1].Value);
+            max = float.Parse(m.Groups[2].Value);
+            return true;
+        }
     }
 }

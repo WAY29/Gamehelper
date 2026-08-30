@@ -199,6 +199,76 @@ namespace GameHelper.Data
             {
                 throw new InvalidOperationException("datc64 family");
             }
+
+            var areas = ParseWorldAreas(Utf16("MapHiddenGrotto", "Hidden Grotto", "G1_1", "The Riverbank"));
+            if (areas.Count != 2 ||
+                areas[0].Id != "MapHiddenGrotto" ||
+                areas[0].English != "Hidden Grotto" ||
+                areas[1].Id != "G1_1")
+            {
+                throw new InvalidOperationException("datc64 areas");
+            }
+        }
+
+        public static List<CatalogArea> ParseWorldAreas(ReadOnlySpan<byte> data)
+        {
+            var strings = ReadUtf16Strings(data);
+            var areas = new List<CatalogArea>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < strings.Count; i++)
+            {
+                var id = strings[i];
+                if (!LooksLikeAreaId(id) || !seen.Add(id))
+                {
+                    continue;
+                }
+
+                var english = string.Empty;
+                if (i + 1 < strings.Count && LooksLikeAreaName(strings[i + 1]))
+                {
+                    english = strings[i + 1];
+                    i++;
+                }
+
+                areas.Add(new CatalogArea { Id = id, English = english });
+            }
+
+            return areas;
+        }
+
+        private static bool LooksLikeAreaId(string s)
+        {
+            if (s.Length < 3 || s.Length > 80 || s[0] is < 'A' or > 'Z')
+            {
+                return false;
+            }
+
+            foreach (var ch in s)
+            {
+                if (ch is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or (>= '0' and <= '9') or '_')
+                {
+                    continue;
+                }
+
+                return false;
+            }
+
+            return true;
+        }
+
+        private static bool LooksLikeAreaName(string s)
+        {
+            if (s.Length < 2 || s.Length > 80 || s.StartsWith("Metadata/", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (s.Contains(' '))
+            {
+                return true;
+            }
+
+            return !LooksLikeAreaId(s) || (s[0] is >= 'A' and <= 'Z' && !s.StartsWith("Map", StringComparison.Ordinal));
         }
     }
 }

@@ -13,9 +13,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Update="item_names.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Update="config\settings.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -31,7 +28,6 @@
   <Target Name="CopyFiles" AfterTargets="Build">
     <ItemGroup>
       <_RitualDeployFiles Include="$(OutDir)$(TargetName)$(TargetExt)" />
-      <_RitualDeployFiles Include="$(OutDir)item_names.json" Condition="Exists('$(OutDir)item_names.json')" />
     </ItemGroup>
     <Copy SourceFiles="@(_RitualDeployFiles)"
           DestinationFolder="..\..\GameHelper\$(OutDir)Plugins\$(ProjectName)"

@@ -25,6 +25,14 @@ namespace GameHelper.Data
         public string ZhTw { get; set; } = string.Empty;
     }
 
+    public sealed class CatalogArea
+    {
+        public string Id { get; set; } = string.Empty;
+        public string English { get; set; } = string.Empty;
+        public string ZhCn { get; set; } = string.Empty;
+        public string ZhTw { get; set; } = string.Empty;
+    }
+
     public static class ItemCatalog
     {
         private static readonly object Gate = new();
@@ -33,6 +41,7 @@ namespace GameHelper.Data
         private static Dictionary<string, CatalogItem> byInternal = new(StringComparer.OrdinalIgnoreCase);
         private static Dictionary<string, string> toEnglish = new(StringComparer.OrdinalIgnoreCase);
         private static Dictionary<string, CatalogMod> byMod = new(StringComparer.OrdinalIgnoreCase);
+        private static Dictionary<string, CatalogArea> byArea = new(StringComparer.OrdinalIgnoreCase);
         private static DateTime extractedUtc;
         private static DateTime namesUtc;
         private static DateTime ggpkWriteUtc;
@@ -212,6 +221,24 @@ namespace GameHelper.Data
             }
         }
 
+        public static List<CatalogArea> SnapshotAreas()
+        {
+            Touch();
+            lock (Gate)
+            {
+                return new List<CatalogArea>(byArea.Values);
+            }
+        }
+
+        public static bool TryGetArea(string id, out CatalogArea? area)
+        {
+            Touch();
+            lock (Gate)
+            {
+                return byArea.TryGetValue(id ?? string.Empty, out area);
+            }
+        }
+
         private static void ExtractGgpkCore()
         {
             try
@@ -229,10 +256,12 @@ namespace GameHelper.Data
 
                 byte[] itemsDat;
                 byte[] modsDat;
+                byte[] areasDat;
                 using (var ggpk = new BundledGGPK(path, parsePathsInIndex: false))
                 {
                     itemsDat = ReadDat(ggpk, "Data/Balance/BaseItemTypes.datc64");
                     modsDat = ReadDat(ggpk, "Data/Balance/Mods.datc64");
+                    areasDat = ReadDat(ggpk, "Data/Balance/WorldAreas.datc64");
                 }
 
                 var items = Datc64Strings.ParseBaseItems(itemsDat);
@@ -243,11 +272,13 @@ namespace GameHelper.Data
 
                 Dictionary<string, CatalogItem> previousItems;
                 Dictionary<string, CatalogMod> previousMods;
+                Dictionary<string, CatalogArea> previousAreas;
                 DateTime previousNamesUtc;
                 lock (Gate)
                 {
                     previousItems = byInternal;
                     previousMods = byMod;
+                    previousAreas = byArea;
                     previousNamesUtc = namesUtc;
                 }
 
@@ -281,6 +312,23 @@ namespace GameHelper.Data
                     mods.Add(mod);
                 }
 
+                var areas = Datc64Strings.ParseWorldAreas(areasDat);
+                foreach (var area in areas)
+                {
+                    if (!previousAreas.TryGetValue(area.Id, out var oldArea))
+                    {
+                        continue;
+                    }
+
+                    if (!string.Equals(oldArea.English, area.English, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    area.ZhCn = oldArea.ZhCn;
+                    area.ZhTw = oldArea.ZhTw;
+                }
+
                 SaveAndApply(new Snapshot
                 {
                     ExtractedUtc = DateTime.UtcNow,
@@ -289,6 +337,7 @@ namespace GameHelper.Data
                     GgpkPath = path,
                     Items = items,
                     Mods = mods,
+                    Areas = areas,
                 });
             }
             catch (Exception ex)
@@ -310,6 +359,7 @@ namespace GameHelper.Data
             {
                 List<CatalogItem> items;
                 List<CatalogMod> mods;
+                List<CatalogArea> areas;
                 DateTime extracted;
                 DateTime ggpkWrite;
                 string path;
@@ -322,6 +372,7 @@ namespace GameHelper.Data
 
                     items = new List<CatalogItem>(byInternal.Values);
                     mods = new List<CatalogMod>(byMod.Values);
+                    areas = new List<CatalogArea>(byArea.Values);
                     extracted = extractedUtc;
                     ggpkWrite = ggpkWriteUtc;
                     path = ggpkPath;
@@ -350,6 +401,18 @@ namespace GameHelper.Data
                     mod.ZhTw = text.ZhTw;
                 }
 
+                var mapNames = Poe2dbMaps.FetchAsync(areas).GetAwaiter().GetResult();
+                foreach (var area in areas)
+                {
+                    if (!mapNames.TryGetValue(area.Id, out var loc))
+                    {
+                        continue;
+                    }
+
+                    area.ZhCn = loc.ZhCn;
+                    area.ZhTw = loc.ZhTw;
+                }
+
                 SaveAndApply(new Snapshot
                 {
                     ExtractedUtc = extracted,
@@ -358,6 +421,7 @@ namespace GameHelper.Data
                     GgpkPath = path,
                     Items = items,
                     Mods = mods,
+                    Areas = areas,
                 });
             }
             catch (Exception ex)
@@ -454,6 +518,16 @@ namespace GameHelper.Data
                 }
 
                 byMod = nextMods;
+                var nextAreas = new Dictionary<string, CatalogArea>(StringComparer.OrdinalIgnoreCase);
+                foreach (var area in snapshot.Areas ?? new List<CatalogArea>())
+                {
+                    if (!string.IsNullOrWhiteSpace(area.Id))
+                    {
+                        nextAreas[area.Id] = area;
+                    }
+                }
+
+                byArea = nextAreas;
                 extractedUtc = snapshot.ExtractedUtc;
                 namesUtc = snapshot.NamesUtc;
                 ggpkWriteUtc = snapshot.GgpkWriteUtc;
@@ -502,6 +576,7 @@ namespace GameHelper.Data
             public string GgpkPath { get; set; } = string.Empty;
             public List<CatalogItem> Items { get; set; } = new();
             public List<CatalogMod> Mods { get; set; } = new();
+            public List<CatalogArea> Areas { get; set; } = new();
         }
     }
 }
