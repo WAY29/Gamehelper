@@ -348,6 +348,66 @@ namespace GameHelper.Data
             {
                 throw new InvalidOperationException("datc64 areas");
             }
+
+            OverlayItemZhTw(items, Utf16(
+                "Metadata/Items/Currency/CurrencyRerollRare",
+                "混沌石",
+                "Metadata/Items/Currency/StackableCurrency",
+                "X"));
+            if (items[0].ZhTw != "混沌石")
+            {
+                throw new InvalidOperationException("datc64 zh-tw items");
+            }
+        }
+
+        public static void OverlayItemZhTw(List<CatalogItem> items, ReadOnlySpan<byte> localized)
+        {
+            if (localized.Length == 0 || items.Count == 0)
+            {
+                return;
+            }
+
+            var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in ParseBaseItems(localized))
+            {
+                if (row.InternalName.Length > 0 && row.English.Length > 0)
+                {
+                    names[row.InternalName] = row.English;
+                }
+            }
+
+            foreach (var item in items)
+            {
+                if (names.TryGetValue(item.InternalName, out var zhTw))
+                {
+                    item.ZhTw = zhTw;
+                }
+            }
+        }
+
+        public static void OverlayAreaZhTw(List<CatalogArea> areas, ReadOnlySpan<byte> localized)
+        {
+            if (localized.Length == 0 || areas.Count == 0)
+            {
+                return;
+            }
+
+            var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in ParseWorldAreas(localized))
+            {
+                if (row.Id.Length > 0 && row.English.Length > 0)
+                {
+                    names[row.Id] = row.English;
+                }
+            }
+
+            foreach (var area in areas)
+            {
+                if (names.TryGetValue(area.Id, out var zhTw))
+                {
+                    area.ZhTw = zhTw;
+                }
+            }
         }
 
         public static List<CatalogArea> ParseWorldAreas(ReadOnlySpan<byte> data)

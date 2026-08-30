@@ -42,6 +42,9 @@ namespace ItemCrafter
 
         public static ModInfo[] Mods { get; private set; } = [];
 
+        private static DateTime loadedExtracted;
+        private static DateTime loadedNames;
+
         public static void Load(string directory)
         {
             OverlayFromItemCatalog();
@@ -50,6 +53,15 @@ namespace ItemCrafter
         private static void OverlayFromItemCatalog()
         {
             ItemCatalog.Touch();
+            if (loadedExtracted == ItemCatalog.ExtractedUtc &&
+                loadedNames == ItemCatalog.NamesUtc &&
+                Mods.Length > 0)
+            {
+                return;
+            }
+
+            loadedExtracted = ItemCatalog.ExtractedUtc;
+            loadedNames = ItemCatalog.NamesUtc;
             var map = new TargetInfo(DefaultTarget, "Waystone (Tier 15)", "Waystone (Tier 15)", "Waystone (Tier 15)");
             if (ItemCatalog.TryGet(DefaultTarget, out var waystone) && waystone != null)
             {
@@ -80,16 +92,23 @@ namespace ItemCrafter
             var namedMods = new List<ModInfo>();
             foreach (var row in ItemCatalog.SnapshotMods())
             {
-                if (string.IsNullOrEmpty(row.Id) || string.IsNullOrEmpty(row.English))
+                if (string.IsNullOrEmpty(row.Id))
                 {
                     continue;
                 }
 
+                if (!row.Id.StartsWith("Tower", StringComparison.Ordinal) &&
+                    !row.Id.StartsWith("Map", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var en = string.IsNullOrEmpty(row.English) ? row.Id : row.English;
                 namedMods.Add(new ModInfo(
                     row.Id,
-                    row.English,
-                    string.IsNullOrEmpty(row.ZhCn) ? row.English : row.ZhCn,
-                    string.IsNullOrEmpty(row.ZhTw) ? row.English : row.ZhTw));
+                    en,
+                    string.IsNullOrEmpty(row.ZhCn) ? en : row.ZhCn,
+                    string.IsNullOrEmpty(row.ZhTw) ? en : row.ZhTw));
             }
 
             Mods = namedMods.ToArray();

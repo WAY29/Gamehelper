@@ -37,6 +37,13 @@ namespace GameHelper.Data
         public string ZhTw { get; set; } = string.Empty;
     }
 
+    public sealed class CatalogText
+    {
+        public string English { get; set; } = string.Empty;
+        public string ZhCn { get; set; } = string.Empty;
+        public string ZhTw { get; set; } = string.Empty;
+    }
+
     public static class ItemCatalog
     {
         private static readonly object Gate = new();
@@ -46,6 +53,9 @@ namespace GameHelper.Data
         private static Dictionary<string, string> toEnglish = new(StringComparer.OrdinalIgnoreCase);
         private static Dictionary<string, CatalogMod> byMod = new(StringComparer.OrdinalIgnoreCase);
         private static Dictionary<string, CatalogArea> byArea = new(StringComparer.OrdinalIgnoreCase);
+        private static Dictionary<string, CatalogText> itemI18n = new(StringComparer.OrdinalIgnoreCase);
+        private static Dictionary<string, CatalogText> modI18n = new(StringComparer.OrdinalIgnoreCase);
+        private static Dictionary<string, CatalogText> areaI18n = new(StringComparer.OrdinalIgnoreCase);
         private static DateTime extractedUtc;
         private static DateTime namesUtc;
         private static DateTime ggpkWriteUtc;
@@ -308,24 +318,37 @@ namespace GameHelper.Data
                     throw new FileNotFoundException("oo2core.dll missing next to GameHelper.exe");
                 }
 
-                SetProgress(0, 6, "open");
+                SetProgress(0, 8, "open");
                 byte[] itemsDat;
                 byte[] modsDat;
                 byte[] areasDat;
                 byte[] artDat;
+                byte[] statsDat;
+                byte[] csdMain;
+                byte[] csdMap;
+                byte[] csdAtlas;
+                byte[] itemsTwDat;
+                byte[] areasTwDat;
                 using (OpenIndex(path, out var index))
                 {
-                    SetProgress(1, 6, "read");
+                    SetProgress(1, 8, "read");
                     itemsDat = ReadDat(index, "Data/Balance/BaseItemTypes.datc64");
-                    SetProgress(2, 6, "read");
+                    itemsTwDat = TryReadDat(index, "Data/Balance/Traditional Chinese/BaseItemTypes.datc64");
+                    SetProgress(2, 8, "read");
                     modsDat = ReadDat(index, "Data/Balance/Mods.datc64");
-                    SetProgress(3, 6, "read");
+                    statsDat = TryReadDat(index, "Data/Balance/Stats.datc64");
+                    SetProgress(3, 8, "read");
                     areasDat = ReadDat(index, "Data/Balance/WorldAreas.datc64");
-                    SetProgress(4, 6, "read");
+                    areasTwDat = TryReadDat(index, "Data/Balance/Traditional Chinese/WorldAreas.datc64");
+                    SetProgress(4, 8, "read");
                     artDat = ReadDat(index, "Data/Balance/ItemVisualIdentity.datc64");
+                    SetProgress(5, 8, "read");
+                    csdMain = TryReadDat(index, "Data/StatDescriptions/stat_descriptions.csd");
+                    csdMap = TryReadDat(index, "Data/StatDescriptions/map_stat_descriptions.csd");
+                    csdAtlas = TryReadDat(index, "Data/StatDescriptions/atlas_stat_descriptions.csd");
                 }
 
-                SetProgress(5, 6, "parse");
+                SetProgress(6, 8, "parse");
                 var items = Datc64Strings.ParseBaseItems(itemsDat);
                 if (items.Count == 0)
                 {
@@ -337,63 +360,73 @@ namespace GameHelper.Data
                 Dictionary<string, CatalogItem> previousItems;
                 Dictionary<string, CatalogMod> previousMods;
                 Dictionary<string, CatalogArea> previousAreas;
+                Dictionary<string, CatalogText> itemLoc;
+                Dictionary<string, CatalogText> modLoc;
+                Dictionary<string, CatalogText> areaLoc;
                 DateTime previousNamesUtc;
                 lock (Gate)
                 {
                     previousItems = byInternal;
                     previousMods = byMod;
                     previousAreas = byArea;
+                    itemLoc = itemI18n;
+                    modLoc = modI18n;
+                    areaLoc = areaI18n;
                     previousNamesUtc = namesUtc;
                 }
 
                 foreach (var item in items)
                 {
-                    if (!previousItems.TryGetValue(item.InternalName, out var old))
-                    {
-                        continue;
-                    }
+                    ApplyItemLoc(item, previousItems, itemLoc);
+                }
 
-                    if (!string.Equals(old.English, item.English, StringComparison.Ordinal))
-                    {
-                        continue;
-                    }
+                Datc64Strings.OverlayItemZhTw(items, itemsTwDat);
 
-                    item.ZhCn = old.ZhCn;
-                    item.ZhTw = old.ZhTw;
+                var oldNames = NamesFromMods(previousMods.Values);
+                foreach (var (id, text) in modLoc)
+                {
+                    oldNames[id] = (text.English, text.ZhCn, text.ZhTw);
                 }
 
                 var mods = new List<CatalogMod>();
                 foreach (var family in Datc64Strings.ParseModFamilies(modsDat))
                 {
-                    var mod = new CatalogMod { Id = family };
-                    if (previousMods.TryGetValue(family, out var oldMod))
+                    mods.Add(new CatalogMod { Id = family });
+                }
+
+                StatDescriptions.Apply(mods, modsDat, statsDat, csdMain, csdMap, csdAtlas);
+                foreach (var mod in mods)
+                {
+                    if (!string.IsNullOrEmpty(mod.English) || !TryModText(oldNames, mod.Id, out var text))
                     {
-                        mod.English = oldMod.English;
-                        mod.ZhCn = oldMod.ZhCn;
-                        mod.ZhTw = oldMod.ZhTw;
+                        continue;
                     }
 
-                    mods.Add(mod);
+                    mod.English = text.En;
+                    mod.ZhCn = text.ZhCn;
+                    mod.ZhTw = text.ZhTw;
                 }
 
                 var areas = Datc64Strings.ParseWorldAreas(areasDat);
                 foreach (var area in areas)
                 {
-                    if (!previousAreas.TryGetValue(area.Id, out var oldArea))
+                    if (previousAreas.TryGetValue(area.Id, out var oldArea) &&
+                        string.Equals(oldArea.English, area.English, StringComparison.Ordinal))
                     {
-                        continue;
+                        area.ZhCn = oldArea.ZhCn;
+                        area.ZhTw = oldArea.ZhTw;
                     }
 
-                    if (!string.Equals(oldArea.English, area.English, StringComparison.Ordinal))
+                    if (areaLoc.TryGetValue(area.Id, out var loc))
                     {
-                        continue;
+                        area.ZhCn = loc.ZhCn;
                     }
-
-                    area.ZhCn = oldArea.ZhCn;
-                    area.ZhTw = oldArea.ZhTw;
                 }
 
-                SetProgress(6, 6, "save");
+                Datc64Strings.OverlayAreaZhTw(areas, areasTwDat);
+
+                SetProgress(7, 8, "parse");
+                SetProgress(8, 8, "save");
                 SaveAndApply(new Snapshot
                 {
                     ExtractedUtc = DateTime.UtcNow,
@@ -403,6 +436,9 @@ namespace GameHelper.Data
                     Items = items,
                     Mods = mods,
                     Areas = areas,
+                    ItemI18n = itemLoc,
+                    ModI18n = modLoc,
+                    AreaI18n = areaLoc,
                 });
             }
             catch (Exception ex)
@@ -425,58 +461,62 @@ namespace GameHelper.Data
                 List<CatalogItem> items;
                 List<CatalogMod> mods;
                 List<CatalogArea> areas;
+                Dictionary<string, CatalogText> itemLoc;
+                Dictionary<string, CatalogText> modLoc;
+                Dictionary<string, CatalogText> areaLoc;
                 DateTime extracted;
                 DateTime ggpkWrite;
                 string path;
                 lock (Gate)
                 {
-                    if (byInternal.Count == 0)
-                    {
-                        throw new InvalidOperationException("Extract GGPK first");
-                    }
-
                     items = new List<CatalogItem>(byInternal.Values);
                     mods = new List<CatalogMod>(byMod.Values);
                     areas = new List<CatalogArea>(byArea.Values);
+                    itemLoc = new Dictionary<string, CatalogText>(itemI18n, StringComparer.OrdinalIgnoreCase);
+                    modLoc = new Dictionary<string, CatalogText>(modI18n, StringComparer.OrdinalIgnoreCase);
+                    areaLoc = new Dictionary<string, CatalogText>(areaI18n, StringComparer.OrdinalIgnoreCase);
                     extracted = extractedUtc;
                     ggpkWrite = ggpkWriteUtc;
                     path = ggpkPath;
                 }
 
-                SetProgress(0, Poe2dbNames.PageCount + Poe2dbMods.PageCount + Poe2dbMaps.PageCount, "names");
+                SetProgress(0, Poe2dbNames.PageCount + Poe2dbMaps.PageCount, "names");
                 var names = Poe2dbNames.FetchEnglishToLocalAsync(TickProgress).GetAwaiter().GetResult();
-                foreach (var item in items)
+                foreach (var (en, loc) in names)
                 {
-                    if (item.English.Length > 0 && names.TryGetValue(item.English, out var loc))
-                    {
-                        item.ZhCn = loc.ZhCn;
-                        item.ZhTw = loc.ZhTw;
-                    }
+                    itemLoc[en] = new CatalogText { English = en, ZhCn = loc.ZhCn, ZhTw = loc.ZhTw };
                 }
 
-                var modNames = Poe2dbMods.FetchAsync(TickProgress).GetAwaiter().GetResult();
-                foreach (var mod in mods)
+                foreach (var item in items)
                 {
-                    if (!TryModText(modNames, mod.Id, out var text))
+                    if (item.English.Length > 0 && itemLoc.TryGetValue(item.English, out var loc))
                     {
-                        continue;
+                        item.ZhCn = loc.ZhCn;
+                        if (item.ZhTw.Length == 0)
+                        {
+                            item.ZhTw = loc.ZhTw;
+                        }
                     }
-
-                    mod.English = text.En;
-                    mod.ZhCn = text.ZhCn;
-                    mod.ZhTw = text.ZhTw;
                 }
 
                 var mapNames = Poe2dbMaps.FetchAsync(areas, TickProgress).GetAwaiter().GetResult();
+                foreach (var (id, loc) in mapNames)
+                {
+                    areaLoc[id] = new CatalogText { ZhCn = loc.ZhCn, ZhTw = loc.ZhTw };
+                }
+
                 foreach (var area in areas)
                 {
-                    if (!mapNames.TryGetValue(area.Id, out var loc))
+                    if (!areaLoc.TryGetValue(area.Id, out var loc))
                     {
                         continue;
                     }
 
                     area.ZhCn = loc.ZhCn;
-                    area.ZhTw = loc.ZhTw;
+                    if (area.ZhTw.Length == 0)
+                    {
+                        area.ZhTw = loc.ZhTw;
+                    }
                 }
 
                 SaveAndApply(new Snapshot
@@ -488,6 +528,9 @@ namespace GameHelper.Data
                     Items = items,
                     Mods = mods,
                     Areas = areas,
+                    ItemI18n = itemLoc,
+                    ModI18n = modLoc,
+                    AreaI18n = areaLoc,
                 });
             }
             catch (Exception ex)
@@ -590,14 +633,25 @@ namespace GameHelper.Data
             }
         }
 
-        private static byte[] ReadDat(LibBundle3.Index index, string datPath)
+        private static byte[] TryReadDat(LibBundle3.Index index, string datPath)
         {
             if (!index.TryGetFile(datPath, out var file) || file is null)
+            {
+                return [];
+            }
+
+            return file.Read().ToArray();
+        }
+
+        private static byte[] ReadDat(LibBundle3.Index index, string datPath)
+        {
+            var bytes = TryReadDat(index, datPath);
+            if (bytes.Length == 0)
             {
                 throw new FileNotFoundException(datPath);
             }
 
-            return file.Read().ToArray();
+            return bytes;
         }
 
         private sealed class SharedBundleFactory : IBundleFactory
@@ -695,12 +749,75 @@ namespace GameHelper.Data
                 }
 
                 byArea = nextAreas;
+                itemI18n = snapshot.ItemI18n ?? itemI18n;
+                modI18n = snapshot.ModI18n ?? modI18n;
+                areaI18n = snapshot.AreaI18n ?? areaI18n;
                 lastError = string.Empty;
                 extractedUtc = snapshot.ExtractedUtc;
                 namesUtc = snapshot.NamesUtc;
                 ggpkWriteUtc = snapshot.GgpkWriteUtc;
                 ggpkPath = snapshot.GgpkPath ?? string.Empty;
                 loaded = true;
+            }
+        }
+
+        private static Dictionary<string, (string En, string ZhCn, string ZhTw)> NamesFromMods(
+            IEnumerable<CatalogMod> rows)
+        {
+            var names = new Dictionary<string, (string En, string ZhCn, string ZhTw)>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in rows)
+            {
+                if (string.IsNullOrEmpty(row.Id) || string.IsNullOrEmpty(row.English))
+                {
+                    continue;
+                }
+
+                names[row.Id] = (row.English, row.ZhCn, row.ZhTw);
+            }
+
+            return names;
+        }
+
+        private static void ApplyModNames(
+            List<CatalogMod> mods,
+            Dictionary<string, (string En, string ZhCn, string ZhTw)> names)
+        {
+            var byId = new Dictionary<string, CatalogMod>(StringComparer.OrdinalIgnoreCase);
+            foreach (var mod in mods)
+            {
+                if (!string.IsNullOrEmpty(mod.Id))
+                {
+                    byId[mod.Id] = mod;
+                }
+            }
+
+            foreach (var (id, text) in names)
+            {
+                if (string.IsNullOrEmpty(id))
+                {
+                    continue;
+                }
+
+                if (!byId.TryGetValue(id, out var mod))
+                {
+                    mod = new CatalogMod { Id = id };
+                    mods.Add(mod);
+                    byId[id] = mod;
+                }
+
+                mod.English = text.En;
+                mod.ZhCn = text.ZhCn;
+                mod.ZhTw = text.ZhTw;
+            }
+
+            foreach (var mod in mods)
+            {
+                if (TryModText(names, mod.Id, out var text))
+                {
+                    mod.English = text.En;
+                    mod.ZhCn = text.ZhCn;
+                    mod.ZhTw = text.ZhTw;
+                }
             }
         }
 
@@ -745,6 +862,28 @@ namespace GameHelper.Data
             public List<CatalogItem> Items { get; set; } = new();
             public List<CatalogMod> Mods { get; set; } = new();
             public List<CatalogArea> Areas { get; set; } = new();
+            public Dictionary<string, CatalogText> ItemI18n { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, CatalogText> ModI18n { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, CatalogText> AreaI18n { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static void ApplyItemLoc(
+            CatalogItem item,
+            Dictionary<string, CatalogItem> previousItems,
+            Dictionary<string, CatalogText> itemLoc)
+        {
+            if (previousItems.TryGetValue(item.InternalName, out var old) &&
+                string.Equals(old.English, item.English, StringComparison.Ordinal))
+            {
+                item.ZhCn = old.ZhCn;
+                item.ZhTw = old.ZhTw;
+            }
+
+            if (item.English.Length > 0 && itemLoc.TryGetValue(item.English, out var loc))
+            {
+                item.ZhCn = loc.ZhCn;
+                item.ZhTw = loc.ZhTw;
+            }
         }
     }
 }

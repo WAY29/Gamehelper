@@ -114,6 +114,7 @@ namespace StashUtilityPlus
 
         public override void DrawSettings()
         {
+            OverlayFromItemCatalog();
             var affixLang = Math.Clamp(this.Settings.AffixLanguage, 0, 3);
             var names = new[]
             {
@@ -1257,22 +1258,41 @@ namespace StashUtilityPlus
             OverlayFromItemCatalog();
         }
 
+        private static DateTime loadedExtracted;
+        private static DateTime loadedNames;
+
         private static void OverlayFromItemCatalog()
         {
             ItemCatalog.Touch();
+            if (loadedExtracted == ItemCatalog.ExtractedUtc &&
+                loadedNames == ItemCatalog.NamesUtc &&
+                Mods.Length > 0)
+            {
+                return;
+            }
+
+            loadedExtracted = ItemCatalog.ExtractedUtc;
+            loadedNames = ItemCatalog.NamesUtc;
             var named = new List<ModInfo>();
             foreach (var row in ItemCatalog.SnapshotMods())
             {
-                if (string.IsNullOrEmpty(row.Id) || string.IsNullOrEmpty(row.English))
+                if (string.IsNullOrEmpty(row.Id))
                 {
                     continue;
                 }
 
+                if (!row.Id.StartsWith("Tower", StringComparison.Ordinal) &&
+                    !row.Id.StartsWith("Map", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var en = string.IsNullOrEmpty(row.English) ? row.Id : row.English;
                 named.Add(new ModInfo(
                     row.Id,
-                    row.English,
-                    string.IsNullOrEmpty(row.ZhCn) ? row.English : row.ZhCn,
-                    string.IsNullOrEmpty(row.ZhTw) ? row.English : row.ZhTw));
+                    en,
+                    string.IsNullOrEmpty(row.ZhCn) ? en : row.ZhCn,
+                    string.IsNullOrEmpty(row.ZhTw) ? en : row.ZhTw));
             }
 
             Mods = named.ToArray();

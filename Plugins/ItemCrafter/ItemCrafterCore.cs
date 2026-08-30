@@ -260,6 +260,7 @@ namespace ItemCrafter
 
         public override void DrawSettings()
         {
+            Catalog.Load(this.DllDirectory);
             ImGui.AlignTextToFramePadding();
             ImGui.Text(this.PluginText.T("settings.toggle", "Toggle key"));
             ImGui.SameLine();

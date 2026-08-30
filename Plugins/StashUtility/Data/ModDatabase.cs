@@ -167,15 +167,15 @@ namespace StashUtility.Data
                     continue;
                 }
 
-                var name = string.IsNullOrEmpty(row.English) ? row.Id : row.English;
-                if (string.IsNullOrEmpty(row.English) && seedTabs.TryGetValue(row.Id, out var seedNamed))
+                var name = row.English;
+                if (string.IsNullOrEmpty(name) && seedTabs.TryGetValue(row.Id, out var seedNamed))
                 {
                     name = seedNamed.Name;
                 }
 
-                if (string.IsNullOrEmpty(row.English) && !seedTabs.ContainsKey(row.Id))
+                if (string.IsNullOrEmpty(name))
                 {
-                    continue;
+                    name = row.Id;
                 }
 
                 var tab = new TabletMod(row.Id, name);
