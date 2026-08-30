@@ -6,6 +6,8 @@ namespace GameHelper.Data
     using System.Threading;
     using System.Threading.Tasks;
     using GameHelper.Settings;
+    using LibBundle3;
+    using LibBundle3.Records;
     using LibBundledGGPK3;
     using Newtonsoft.Json;
 
@@ -298,7 +300,7 @@ namespace GameHelper.Data
                 var path = (Core.GHSettings.ContentGgpkPath ?? string.Empty).Trim();
                 if (path.Length == 0 || !File.Exists(path))
                 {
-                    throw new FileNotFoundException("Select Content.ggpk first", path);
+                    throw new FileNotFoundException("Select Content.ggpk or _.index.bin first", path);
                 }
 
                 if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "oo2core.dll")))
@@ -311,23 +313,16 @@ namespace GameHelper.Data
                 byte[] modsDat;
                 byte[] areasDat;
                 byte[] artDat;
-                using var stream = new FileStream(
-                    path,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.ReadWrite | FileShare.Delete,
-                    1 << 16,
-                    FileOptions.RandomAccess);
-                using (var ggpk = new BundledGGPK(stream, leaveOpen: false, parsePathsInIndex: false))
+                using (OpenIndex(path, out var index))
                 {
                     SetProgress(1, 6, "read");
-                    itemsDat = ReadDat(ggpk, "Data/Balance/BaseItemTypes.datc64");
+                    itemsDat = ReadDat(index, "Data/Balance/BaseItemTypes.datc64");
                     SetProgress(2, 6, "read");
-                    modsDat = ReadDat(ggpk, "Data/Balance/Mods.datc64");
+                    modsDat = ReadDat(index, "Data/Balance/Mods.datc64");
                     SetProgress(3, 6, "read");
-                    areasDat = ReadDat(ggpk, "Data/Balance/WorldAreas.datc64");
+                    areasDat = ReadDat(index, "Data/Balance/WorldAreas.datc64");
                     SetProgress(4, 6, "read");
-                    artDat = ReadDat(ggpk, "Data/Balance/ItemVisualIdentity.datc64");
+                    artDat = ReadDat(index, "Data/Balance/ItemVisualIdentity.datc64");
                 }
 
                 SetProgress(5, 6, "parse");
@@ -565,14 +560,75 @@ namespace GameHelper.Data
             return false;
         }
 
-        private static byte[] ReadDat(BundledGGPK ggpk, string ggpkPath)
+        private static IDisposable OpenIndex(string path, out LibBundle3.Index index)
         {
-            if (!ggpk.Index.TryGetFile(ggpkPath, out var file) || file is null)
+            var stream = new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete,
+                1 << 16,
+                FileOptions.RandomAccess);
+            try
             {
-                throw new FileNotFoundException(ggpkPath);
+                if (path.EndsWith(".ggpk", StringComparison.OrdinalIgnoreCase))
+                {
+                    var ggpk = new BundledGGPK(stream, leaveOpen: false, parsePathsInIndex: false);
+                    index = ggpk.Index;
+                    return ggpk;
+                }
+
+                var dir = Path.GetDirectoryName(path) ?? string.Empty;
+                var idx = new LibBundle3.Index(stream, leaveOpen: false, parsePaths: false, new SharedBundleFactory(dir));
+                index = idx;
+                return idx;
+            }
+            catch
+            {
+                stream.Dispose();
+                throw;
+            }
+        }
+
+        private static byte[] ReadDat(LibBundle3.Index index, string datPath)
+        {
+            if (!index.TryGetFile(datPath, out var file) || file is null)
+            {
+                throw new FileNotFoundException(datPath);
             }
 
             return file.Read().ToArray();
+        }
+
+        private sealed class SharedBundleFactory : IBundleFactory
+        {
+            private readonly string baseDir;
+
+            public SharedBundleFactory(string baseDirectory)
+            {
+                baseDir = Path.GetFullPath(baseDirectory);
+                if (!baseDir.EndsWith(Path.DirectorySeparatorChar))
+                {
+                    baseDir += Path.DirectorySeparatorChar;
+                }
+            }
+
+            public Bundle GetBundle(BundleRecord record)
+            {
+                var stream = new FileStream(
+                    baseDir + record.Path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete,
+                    1 << 16,
+                    FileOptions.RandomAccess);
+                return new Bundle(stream, leaveOpen: false, record);
+            }
+
+            public Stream CreateBundle(string bundlePath) =>
+                throw new NotSupportedException();
+
+            public bool DeleteBundle(string bundlePath) => false;
         }
 
         private static void TryLoadFromDisk()

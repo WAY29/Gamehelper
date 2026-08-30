@@ -503,7 +503,7 @@ namespace GameHelper.Settings
                 L.T("settings.datasources.catalog.title", "Metadata"),
                 L.T(
                     "settings.datasources.catalog.subtitle",
-                    "Reads items, mods, and maps from Content.ggpk. Simplified and Traditional Chinese are fetched from poe2db.tw."));
+                    "Standalone: Content.ggpk. Steam/Epic: Bundles2/_.index.bin. Chinese names from poe2db.tw."));
 
             ItemCatalog.Touch();
             if (!string.IsNullOrEmpty(pendingGgpkPath))
@@ -515,7 +515,7 @@ namespace GameHelper.Settings
             var ggpk = Core.GHSettings.ContentGgpkPath ?? string.Empty;
             if (string.IsNullOrEmpty(ggpk))
             {
-                ImGui.TextDisabled(L.T("settings.datasources.catalog.ggpk_none", "No Content.ggpk selected"));
+                ImGui.TextDisabled(L.T("settings.datasources.catalog.ggpk_none", "No Content.ggpk or _.index.bin selected"));
             }
             else
             {
@@ -530,7 +530,7 @@ namespace GameHelper.Settings
             }
 
             ImGui.SameLine();
-            if (ImGui.Button(L.T("settings.datasources.catalog.extract", "Extract GGPK")))
+            if (ImGui.Button(L.T("settings.datasources.catalog.extract", "Extract")))
             {
                 ItemCatalog.ExtractGgpk();
             }
@@ -649,7 +649,7 @@ namespace GameHelper.Settings
                 for (var i = 0; i < 40; i++)
                 {
                     Thread.Sleep(50);
-                    var hwnd = FindWindowW(null, "Content.ggpk");
+                    var hwnd = FindWindowW(null, "Content.ggpk / _.index.bin");
                     if (hwnd == IntPtr.Zero)
                     {
                         continue;
@@ -668,7 +668,7 @@ namespace GameHelper.Settings
             const int maxFile = 1024;
             var filePtr = Marshal.AllocHGlobal(maxFile * 2);
             var filterPtr = Marshal.StringToHGlobalUni(
-                "Content.ggpk\0Content.ggpk\0GGPK (*.ggpk)\0*.ggpk\0All files (*.*)\0*.*\0");
+                "PoE2 data\0Content.ggpk;_.index.bin\0GGPK (*.ggpk)\0*.ggpk\0Index (_.index.bin)\0_.index.bin\0All files (*.*)\0*.*\0");
             try
             {
                 Marshal.Copy(new byte[maxFile * 2], 0, filePtr, maxFile * 2);
@@ -683,7 +683,7 @@ namespace GameHelper.Settings
                     lpstrFile = filePtr,
                     nMaxFile = maxFile,
                     lpstrInitialDir = string.IsNullOrEmpty(current) ? string.Empty : System.IO.Path.GetDirectoryName(current) ?? string.Empty,
-                    lpstrTitle = "Content.ggpk",
+                    lpstrTitle = "Content.ggpk / _.index.bin",
                     Flags = 0x00080000 | 0x00001000 | 0x00000800 | 0x00000008,
                 };
                 return GetOpenFileNameW(ref ofn) ? Marshal.PtrToStringUni(filePtr) ?? string.Empty : string.Empty;
