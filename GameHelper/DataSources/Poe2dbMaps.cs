@@ -14,12 +14,17 @@ namespace GameHelper.Data
 
         private static readonly HttpClient Http = CreateHttp();
 
+        internal static int PageCount => 2;
+
         public static async Task<Dictionary<string, (string ZhCn, string ZhTw)>> FetchAsync(
-            IEnumerable<CatalogArea> areas)
+            IEnumerable<CatalogArea> areas,
+            Action? onPage = null)
         {
-            var cn = await FetchLocaleAsync("cn").ConfigureAwait(false);
-            await Task.Delay(150).ConfigureAwait(false);
-            var tw = await FetchLocaleAsync("tw").ConfigureAwait(false);
+            var cnTask = FetchLocaleAsync("cn", onPage);
+            var twTask = FetchLocaleAsync("tw", onPage);
+            await Task.WhenAll(cnTask, twTask).ConfigureAwait(false);
+            var cn = cnTask.Result;
+            var tw = twTask.Result;
 
             var outMap = new Dictionary<string, (string ZhCn, string ZhTw)>(StringComparer.OrdinalIgnoreCase);
             foreach (var area in areas)
@@ -48,12 +53,13 @@ namespace GameHelper.Data
             return outMap;
         }
 
-        private static async Task<Dictionary<string, string>> FetchLocaleAsync(string locale)
+        private static async Task<Dictionary<string, string>> FetchLocaleAsync(string locale, Action? onPage)
         {
             var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             try
             {
-                var html = await Http.GetStringAsync($"https://poe2db.tw/{locale}/Waystones").ConfigureAwait(false);
+                var html = await Poe2dbHttp.GetHtmlAsync(Http, $"https://poe2db.tw/{locale}/Waystones")
+                    .ConfigureAwait(false);
                 var start = html.IndexOf("id=\"EndGameMaps\"", StringComparison.Ordinal);
                 var chunk = start >= 0 ? html[start..] : html;
                 foreach (Match m in Link.Matches(chunk))
@@ -72,6 +78,7 @@ namespace GameHelper.Data
             {
             }
 
+            onPage?.Invoke();
             return map;
         }
 

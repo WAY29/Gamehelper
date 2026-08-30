@@ -8,8 +8,8 @@ namespace GameHelper.Settings
     using System.Collections.Generic;
     using System.Linq;
     using System.Numerics;
+    using System.Runtime.InteropServices;
     using System.Threading;
-    using System.Windows.Forms;
     using ClickableTransparentOverlay;
     using ClickableTransparentOverlay.Win32;
     using Coroutine;
@@ -38,6 +38,8 @@ namespace GameHelper.Settings
         private static string selectedSettingsPage = PluginManagerPageId;
         private static int selectedMarketLeagueIndex = -1;
         private static string pluginReloadStatus = string.Empty;
+        private static volatile bool browsingGgpk;
+        private static string pendingGgpkPath = string.Empty;
 
         private static EntityFilterType efilterType = EntityFilterType.PATH;
         private static string filterText = string.Empty;
@@ -458,10 +460,13 @@ namespace GameHelper.Settings
                 MarketPrices.ForceRefresh(ignoreCooldown: true);
             }
 
-            ImGui.SameLine();
             if (MarketPrices.IsFetching || LeagueProvider.IsLoading)
             {
-                ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.2f, 1f), L.T("settings.datasources.market.loading", "Loading..."));
+                DrawJobProgress(
+                    MarketPrices.Progress,
+                    MarketPrices.ProgressDone,
+                    MarketPrices.ProgressTotal,
+                    L.T("settings.datasources.market.loading", "Loading prices..."));
             }
             else if (MarketPrices.LastFetchUtc > DateTime.MinValue)
             {
@@ -495,12 +500,18 @@ namespace GameHelper.Settings
         private static void DrawCatalogSettings()
         {
             ImGuiTheme.SectionHeader(
-                L.T("settings.datasources.catalog.title", "Item Catalog"),
+                L.T("settings.datasources.catalog.title", "Metadata"),
                 L.T(
                     "settings.datasources.catalog.subtitle",
-                    "BaseItemTypes + Mods from Content.ggpk; names from poe2db.tw list pages."));
+                    "Reads items, mods, and maps from Content.ggpk. Simplified and Traditional Chinese are fetched from poe2db.tw."));
 
             ItemCatalog.Touch();
+            if (!string.IsNullOrEmpty(pendingGgpkPath))
+            {
+                Core.GHSettings.ContentGgpkPath = pendingGgpkPath;
+                pendingGgpkPath = string.Empty;
+            }
+
             var ggpk = Core.GHSettings.ContentGgpkPath ?? string.Empty;
             if (string.IsNullOrEmpty(ggpk))
             {
@@ -511,37 +522,32 @@ namespace GameHelper.Settings
                 ImGui.TextWrapped(ggpk);
             }
 
+            var busy = ItemCatalog.IsExtracting || ItemCatalog.IsFetchingNames || browsingGgpk;
+            ImGui.BeginDisabled(busy);
             if (ImGui.Button(L.T("settings.datasources.catalog.browse", "Browse...")))
             {
-                var picked = BrowseGgpk(ggpk);
-                if (!string.IsNullOrEmpty(picked))
-                {
-                    Core.GHSettings.ContentGgpkPath = picked;
-                }
+                StartBrowseGgpk(ggpk);
             }
 
-            var busy = ItemCatalog.IsExtracting || ItemCatalog.IsFetchingNames;
-            ImGui.BeginDisabled(busy);
+            ImGui.SameLine();
             if (ImGui.Button(L.T("settings.datasources.catalog.extract", "Extract GGPK")))
             {
                 ItemCatalog.ExtractGgpk();
             }
 
-            ImGui.SameLine();
-            if (ImGui.Button(L.T("settings.datasources.catalog.names", "Refresh names (poe2db)")))
-            {
-                ItemCatalog.RefreshNames();
-            }
-
             ImGui.EndDisabled();
+
+            ImGui.TextDisabled(L.T(
+                "settings.datasources.catalog.help",
+                "Needs oo2core.dll in the same folder as GameHelper.exe."));
 
             if (ItemCatalog.IsExtracting)
             {
-                ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.2f, 1f), L.T("settings.datasources.catalog.extracting", "Extracting GGPK..."));
-            }
-            else if (ItemCatalog.IsFetchingNames)
-            {
-                ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.2f, 1f), L.T("settings.datasources.catalog.fetching", "Fetching poe2db names..."));
+                DrawJobProgress(
+                    ItemCatalog.Progress,
+                    ItemCatalog.ProgressDone,
+                    ItemCatalog.ProgressTotal,
+                    CatalogStageLabel(ItemCatalog.ProgressStage));
             }
 
             if (ItemCatalog.ExtractedUtc > DateTime.MinValue)
@@ -557,64 +563,196 @@ namespace GameHelper.Settings
                         ItemCatalog.GgpkWriteUtc.ToLocalTime()));
             }
 
+            if (ItemCatalog.GgpkIsNewerThanCatalog)
+            {
+                ImGui.TextColored(
+                    new Vector4(0.95f, 0.75f, 0.3f, 1f),
+                    L.T("settings.datasources.catalog.stale", "Content.ggpk is newer. Extract again."));
+            }
+
+            if (ItemCatalog.LastError == "oo2core")
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.95f, 0.45f, 0.35f, 1f));
+                ImGui.TextWrapped(L.T(
+                    "settings.datasources.catalog.error.oo2core",
+                    "Extract failed: copy oo2core.dll into the same folder as GameHelper.exe. Get it from VisualGGPK3."));
+                ImGui.PopStyleColor();
+            }
+
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
+            ImGui.BeginDisabled(busy);
+            if (ImGui.Button(L.T("settings.datasources.catalog.names", "Fetch translations")))
+            {
+                ItemCatalog.RefreshNames();
+            }
+
+            ImGui.EndDisabled();
+            ImGui.TextDisabled(L.T(
+                "settings.datasources.catalog.names_help",
+                "Fetches Simplified and Traditional Chinese from poe2db.tw."));
+
+            if (ItemCatalog.IsFetchingNames)
+            {
+                DrawJobProgress(
+                    ItemCatalog.Progress,
+                    ItemCatalog.ProgressDone,
+                    ItemCatalog.ProgressTotal,
+                    L.T("settings.datasources.catalog.fetching", "Fetching translations..."));
+            }
+
             if (ItemCatalog.NamesUtc > DateTime.MinValue)
             {
                 ImGui.TextColored(
                     new Vector4(0.5f, 0.8f, 0.5f, 1f),
                     L.F(
                         "settings.datasources.catalog.names_status",
-                        "{0} named | {1}",
+                        "{0} translated | {1}",
                         ItemCatalog.NamedCount,
                         FormatAgo(ItemCatalog.NamesUtc)));
             }
 
-            if (ItemCatalog.GgpkIsNewerThanCatalog)
+            if (!string.IsNullOrEmpty(ItemCatalog.LastError) && ItemCatalog.LastError != "oo2core")
             {
-                ImGui.TextColored(
-                    new Vector4(0.95f, 0.75f, 0.3f, 1f),
-                    L.T("settings.datasources.catalog.stale", "Content.ggpk is newer than this catalog. Extract again."));
-            }
-
-            if (!string.IsNullOrEmpty(ItemCatalog.LastError))
-            {
-                var error = ItemCatalog.LastError == "oo2core"
-                    ? L.T(
-                        "settings.datasources.catalog.error.oo2core",
-                        "Extract failed: copy oo2core.dll next to GameHelper.exe. Get it from VisualGGPK3.")
-                    : ItemCatalog.LastError;
                 ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.95f, 0.45f, 0.35f, 1f));
-                ImGui.TextWrapped(error);
+                ImGui.TextWrapped(ItemCatalog.LastError);
                 ImGui.PopStyleColor();
             }
+        }
 
-            ImGui.TextWrapped(L.T(
-                "settings.datasources.catalog.help",
-                "Needs oo2core.dll next to GameHelper.exe."));
+        private static void StartBrowseGgpk(string current)
+        {
+            if (browsingGgpk)
+            {
+                return;
+            }
+
+            browsingGgpk = true;
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    pendingGgpkPath = BrowseGgpk(current);
+                }
+                finally
+                {
+                    browsingGgpk = false;
+                }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.IsBackground = true;
+            thread.Start();
+            new Thread(() =>
+            {
+                for (var i = 0; i < 40; i++)
+                {
+                    Thread.Sleep(50);
+                    var hwnd = FindWindowW(null, "Content.ggpk");
+                    if (hwnd == IntPtr.Zero)
+                    {
+                        continue;
+                    }
+
+                    SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0040);
+                    SetForegroundWindow(hwnd);
+                    return;
+                }
+            })
+            { IsBackground = true }.Start();
         }
 
         private static string BrowseGgpk(string current)
         {
-            var picked = string.Empty;
-            var thread = new Thread(() =>
+            const int maxFile = 1024;
+            var filePtr = Marshal.AllocHGlobal(maxFile * 2);
+            var filterPtr = Marshal.StringToHGlobalUni(
+                "Content.ggpk\0Content.ggpk\0GGPK (*.ggpk)\0*.ggpk\0All files (*.*)\0*.*\0");
+            try
             {
-                using var dlg = new OpenFileDialog
+                Marshal.Copy(new byte[maxFile * 2], 0, filePtr, maxFile * 2);
+                var seed = string.IsNullOrEmpty(current) ? "Content.ggpk" : System.IO.Path.GetFileName(current);
+                Marshal.Copy(seed.ToCharArray(), 0, filePtr, seed.Length);
+
+                var ofn = new OpenFileName
                 {
-                    Title = "Content.ggpk",
-                    Filter = "Content.ggpk|Content.ggpk|GGPK (*.ggpk)|*.ggpk|All files (*.*)|*.*",
-                    FileName = string.IsNullOrEmpty(current) ? "Content.ggpk" : System.IO.Path.GetFileName(current),
-                    InitialDirectory = string.IsNullOrEmpty(current) ? string.Empty : System.IO.Path.GetDirectoryName(current),
-                    CheckFileExists = true,
+                    lStructSize = Marshal.SizeOf<OpenFileName>(),
+                    lpstrFilter = filterPtr,
+                    nFilterIndex = 1,
+                    lpstrFile = filePtr,
+                    nMaxFile = maxFile,
+                    lpstrInitialDir = string.IsNullOrEmpty(current) ? string.Empty : System.IO.Path.GetDirectoryName(current) ?? string.Empty,
+                    lpstrTitle = "Content.ggpk",
+                    Flags = 0x00080000 | 0x00001000 | 0x00000800 | 0x00000008,
                 };
-                if (dlg.ShowDialog() == DialogResult.OK)
-                {
-                    picked = dlg.FileName;
-                }
-            });
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
-            return picked;
+                return GetOpenFileNameW(ref ofn) ? Marshal.PtrToStringUni(filePtr) ?? string.Empty : string.Empty;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(filterPtr);
+                Marshal.FreeHGlobal(filePtr);
+            }
         }
+
+        [DllImport("comdlg32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool GetOpenFileNameW(ref OpenFileName ofn);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern IntPtr FindWindowW(string? lpClassName, string lpWindowName);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct OpenFileName
+        {
+            public int lStructSize;
+            public IntPtr hwndOwner;
+            public IntPtr hInstance;
+            public IntPtr lpstrFilter;
+            public string lpstrCustomFilter;
+            public int nMaxCustFilter;
+            public int nFilterIndex;
+            public IntPtr lpstrFile;
+            public int nMaxFile;
+            public IntPtr lpstrFileTitle;
+            public int nMaxFileTitle;
+            public string lpstrInitialDir;
+            public string lpstrTitle;
+            public int Flags;
+            public short nFileOffset;
+            public short nFileExtension;
+            public string lpstrDefExt;
+            public IntPtr lCustData;
+            public IntPtr lpfnHook;
+            public string lpTemplateName;
+            public IntPtr pvReserved;
+            public int dwReserved;
+            public int FlagsEx;
+        }
+
+        private static void DrawJobProgress(float value, int done, int total, string label)
+        {
+            var bar = float.IsFinite(value) ? Math.Clamp(value, 0f, 1f) : 0f;
+            var overlay = total > 0
+                ? $"{label}  {done}/{total}"
+                : label;
+            ImGui.ProgressBar(bar, new Vector2(-1, 18), overlay);
+        }
+
+        private static string CatalogStageLabel(string stage) => stage switch
+        {
+            "open" => L.T("settings.datasources.catalog.progress.open", "Opening GGPK..."),
+            "read" => L.T("settings.datasources.catalog.progress.read", "Reading tables..."),
+            "parse" => L.T("settings.datasources.catalog.progress.parse", "Parsing..."),
+            "save" => L.T("settings.datasources.catalog.progress.save", "Saving..."),
+            "names" => L.T("settings.datasources.catalog.fetching", "Fetching translations..."),
+            _ => L.T("settings.datasources.catalog.extracting", "Extracting GGPK..."),
+        };
 
         private static string FormatAgo(DateTime utc)
         {

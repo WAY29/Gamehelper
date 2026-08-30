@@ -3,6 +3,7 @@ namespace GameHelper.Data
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Threading;
     using System.Threading.Tasks;
     using GameHelper.Settings;
     using LibBundledGGPK3;
@@ -51,6 +52,10 @@ namespace GameHelper.Data
         private static bool loaded;
         private static bool extracting;
         private static bool fetchingNames;
+        private static float progress;
+        private static int progressDone;
+        private static int progressTotal;
+        private static string progressStage = string.Empty;
 
         public static bool IsExtracting
         {
@@ -65,6 +70,26 @@ namespace GameHelper.Data
         public static string LastError
         {
             get { lock (Gate) return lastError; }
+        }
+
+        public static float Progress
+        {
+            get { lock (Gate) return progress; }
+        }
+
+        public static int ProgressDone
+        {
+            get { lock (Gate) return progressDone; }
+        }
+
+        public static int ProgressTotal
+        {
+            get { lock (Gate) return progressTotal; }
+        }
+
+        public static string ProgressStage
+        {
+            get { lock (Gate) return progressStage; }
         }
 
         public static DateTime ExtractedUtc
@@ -151,9 +176,31 @@ namespace GameHelper.Data
 
                 extracting = true;
                 lastError = string.Empty;
+                progress = 0f;
+                progressDone = 0;
+                progressTotal = 6;
+                progressStage = "open";
             }
 
-            _ = Task.Run(ExtractGgpkCore);
+            new Thread(() =>
+            {
+                try
+                {
+                    ExtractGgpkCore();
+                }
+                catch (Exception ex)
+                {
+                    Fail(ex);
+                    lock (Gate)
+                    {
+                        extracting = false;
+                    }
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "ItemCatalog.ExtractGgpk",
+            }.Start();
         }
 
         public static void RefreshNames()
@@ -167,6 +214,10 @@ namespace GameHelper.Data
 
                 fetchingNames = true;
                 lastError = string.Empty;
+                progress = 0f;
+                progressDone = 0;
+                progressTotal = Poe2dbNames.PageCount + Poe2dbMods.PageCount + Poe2dbMaps.PageCount;
+                progressStage = "names";
             }
 
             _ = Task.Run(RefreshNamesCore);
@@ -255,18 +306,31 @@ namespace GameHelper.Data
                     throw new FileNotFoundException("oo2core.dll missing next to GameHelper.exe");
                 }
 
+                SetProgress(0, 6, "open");
                 byte[] itemsDat;
                 byte[] modsDat;
                 byte[] areasDat;
                 byte[] artDat;
-                using (var ggpk = new BundledGGPK(path, parsePathsInIndex: false))
+                using var stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete,
+                    1 << 16,
+                    FileOptions.RandomAccess);
+                using (var ggpk = new BundledGGPK(stream, leaveOpen: false, parsePathsInIndex: false))
                 {
+                    SetProgress(1, 6, "read");
                     itemsDat = ReadDat(ggpk, "Data/Balance/BaseItemTypes.datc64");
+                    SetProgress(2, 6, "read");
                     modsDat = ReadDat(ggpk, "Data/Balance/Mods.datc64");
+                    SetProgress(3, 6, "read");
                     areasDat = ReadDat(ggpk, "Data/Balance/WorldAreas.datc64");
+                    SetProgress(4, 6, "read");
                     artDat = ReadDat(ggpk, "Data/Balance/ItemVisualIdentity.datc64");
                 }
 
+                SetProgress(5, 6, "parse");
                 var items = Datc64Strings.ParseBaseItems(itemsDat);
                 if (items.Count == 0)
                 {
@@ -334,6 +398,7 @@ namespace GameHelper.Data
                     area.ZhTw = oldArea.ZhTw;
                 }
 
+                SetProgress(6, 6, "save");
                 SaveAndApply(new Snapshot
                 {
                     ExtractedUtc = DateTime.UtcNow,
@@ -383,7 +448,8 @@ namespace GameHelper.Data
                     path = ggpkPath;
                 }
 
-                var names = Poe2dbNames.FetchEnglishToLocalAsync().GetAwaiter().GetResult();
+                SetProgress(0, Poe2dbNames.PageCount + Poe2dbMods.PageCount + Poe2dbMaps.PageCount, "names");
+                var names = Poe2dbNames.FetchEnglishToLocalAsync(TickProgress).GetAwaiter().GetResult();
                 foreach (var item in items)
                 {
                     if (item.English.Length > 0 && names.TryGetValue(item.English, out var loc))
@@ -393,7 +459,7 @@ namespace GameHelper.Data
                     }
                 }
 
-                var modNames = Poe2dbMods.FetchAsync().GetAwaiter().GetResult();
+                var modNames = Poe2dbMods.FetchAsync(TickProgress).GetAwaiter().GetResult();
                 foreach (var mod in mods)
                 {
                     if (!TryModText(modNames, mod.Id, out var text))
@@ -406,7 +472,7 @@ namespace GameHelper.Data
                     mod.ZhTw = text.ZhTw;
                 }
 
-                var mapNames = Poe2dbMaps.FetchAsync(areas).GetAwaiter().GetResult();
+                var mapNames = Poe2dbMaps.FetchAsync(areas, TickProgress).GetAwaiter().GetResult();
                 foreach (var area in areas)
                 {
                     if (!mapNames.TryGetValue(area.Id, out var loc))
@@ -447,6 +513,26 @@ namespace GameHelper.Data
             Directory.CreateDirectory("configs");
             File.WriteAllText(CachePath, JsonConvert.SerializeObject(snapshot));
             Apply(snapshot);
+        }
+
+        private static void SetProgress(int done, int total, string stage)
+        {
+            lock (Gate)
+            {
+                progressDone = done;
+                progressTotal = total;
+                progressStage = stage;
+                progress = total <= 0 ? 0f : done / (float)total;
+            }
+        }
+
+        private static void TickProgress()
+        {
+            lock (Gate)
+            {
+                progressDone++;
+                progress = progressTotal <= 0 ? 0f : progressDone / (float)progressTotal;
+            }
         }
 
         private static void Fail(Exception ex)

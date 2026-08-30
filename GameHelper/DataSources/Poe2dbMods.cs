@@ -18,6 +18,8 @@ namespace GameHelper.Data
 
         private static readonly string[] Locales = { "us", "cn", "tw" };
 
+        internal static int PageCount => Slugs.Length * Locales.Length;
+
         private static readonly Regex Family = new(
             @"ModFamilyList"":\[""([^""]+)""\]",
             RegexOptions.Compiled);
@@ -29,7 +31,8 @@ namespace GameHelper.Data
         private static readonly Regex Tags = new("<[^>]+>", RegexOptions.Compiled);
         private static readonly HttpClient Http = CreateHttp();
 
-        public static async Task<Dictionary<string, (string En, string ZhCn, string ZhTw)>> FetchAsync()
+        public static async Task<Dictionary<string, (string En, string ZhCn, string ZhTw)>> FetchAsync(
+            Action? onPage = null)
         {
             var byLocale = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
             foreach (var locale in Locales)
@@ -37,26 +40,16 @@ namespace GameHelper.Data
                 byLocale[locale] = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             }
 
+            var jobs = new List<Task>();
             foreach (var slug in Slugs)
             {
                 foreach (var locale in Locales)
                 {
-                    try
-                    {
-                        var html = await Http.GetStringAsync($"https://poe2db.tw/{locale}/{slug}").ConfigureAwait(false);
-                        foreach (var (family, text) in Parse(html))
-                        {
-                            byLocale[locale].TryAdd(family, text);
-                            byLocale[locale].TryAdd(StripPrefix(family), text);
-                        }
-                    }
-                    catch
-                    {
-                    }
-
-                    await Task.Delay(150).ConfigureAwait(false);
+                    jobs.Add(FetchPageAsync(byLocale[locale], slug, locale, onPage));
                 }
             }
+
+            await Task.WhenAll(jobs).ConfigureAwait(false);
 
             var us = byLocale["us"];
             var cn = byLocale["cn"];
@@ -85,6 +78,32 @@ namespace GameHelper.Data
             }
 
             return family;
+        }
+
+        private static async Task FetchPageAsync(
+            Dictionary<string, string> dest,
+            string slug,
+            string locale,
+            Action? onPage)
+        {
+            try
+            {
+                var html = await Poe2dbHttp.GetHtmlAsync(Http, $"https://poe2db.tw/{locale}/{slug}")
+                    .ConfigureAwait(false);
+                lock (dest)
+                {
+                    foreach (var (family, text) in Parse(html))
+                    {
+                        dest.TryAdd(family, text);
+                        dest.TryAdd(StripPrefix(family), text);
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            onPage?.Invoke();
         }
 
         private static IEnumerable<(string Family, string Text)> Parse(string html)

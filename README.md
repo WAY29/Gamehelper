@@ -78,6 +78,7 @@ Source commits should be descriptive (`[Core] …`, `[Radar] …`), not bulk `Re
 | `Downloader/` | Standalone installer EXE |
 | `GameOffsets/` | Game structure offsets |
 | `Plugins/` | Atlas, Radar, AutoPot, … |
+| `third_party/LibGGPK3/` | Vendored [LibGGPK3](https://github.com/aianlinb/LibGGPK3) (AGPL-3.0) for reading `Content.ggpk` |
 | `scripts/` | Build & publish automation |
 | `CREDITS.md` | Attribution |
 | `SECURITY.md` | Auto-update & trust |

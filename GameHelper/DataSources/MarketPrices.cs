@@ -114,6 +114,9 @@ namespace GameHelper.Data
         private static Dictionary<string, string> pathBasenameToItemName = new(StringComparer.OrdinalIgnoreCase);
 
         private static bool isFetching;
+        private static float progress;
+        private static int progressDone;
+        private static int progressTotal;
         private static bool cacheLoadAttempted;
         private static string cacheFilePath = Path.Combine("configs", "market_prices.json");
         private static DateTime lastFetchTime = DateTime.MinValue;
@@ -130,6 +133,9 @@ namespace GameHelper.Data
         public static int LoadedItemCount { get; private set; }
         public static DateTime LastFetchUtc => lastFetchTime;
         public static bool IsFetching => isFetching;
+        public static float Progress { get { lock (Gate) return progress; } }
+        public static int ProgressDone { get { lock (Gate) return progressDone; } }
+        public static int ProgressTotal { get { lock (Gate) return progressTotal; } }
         public static string LastError
         {
             get { lock (Gate) return lastError; }
@@ -609,7 +615,21 @@ namespace GameHelper.Data
         {
             if (isFetching) return;
             isFetching = true;
+            progress = 0f;
+            progressDone = 0;
+            progressTotal = configuredSource == SourcePoe2Scout
+                ? 1 + ScoutCurrencyCategories.Length + ScoutUniqueCategories.Length + NinjaStashTypes.Length
+                : NinjaExchangeTypes.Length + NinjaStashTypes.Length;
             Task.Run(FetchPricesAsync);
+        }
+
+        private static void StepFetch()
+        {
+            lock (Gate)
+            {
+                progressDone++;
+                progress = progressTotal <= 0 ? 0f : progressDone / (float)progressTotal;
+            }
         }
 
         private static async Task FetchPricesAsync()
@@ -704,17 +724,20 @@ namespace GameHelper.Data
         {
             var league = Uri.EscapeDataString(configuredLeague);
             var rates = await UpdateScoutRatesAsync(league, divChaos, exChaos).ConfigureAwait(false);
+            StepFetch();
             divChaos = rates.DivChaos;
             exChaos = rates.ExChaos;
 
             foreach (var category in ScoutCurrencyCategories)
             {
                 await FetchScoutCurrencyCategoryAsync(league, category, flat, pathNames).ConfigureAwait(false);
+                StepFetch();
             }
 
             foreach (var category in ScoutUniqueCategories)
             {
                 await FetchScoutUniqueCategoryAsync(league, category, uniques, pathNames).ConfigureAwait(false);
+                StepFetch();
             }
 
             return new RatePair(divChaos, exChaos);
@@ -986,6 +1009,7 @@ namespace GameHelper.Data
                 var rates = await FetchNinjaExchangeApi(url, flat, pathNames, divChaos, exChaos).ConfigureAwait(false);
                 divChaos = rates.DivChaos;
                 exChaos = rates.ExChaos;
+                StepFetch();
             }
 
             return await FetchNinjaStashOverviewsAsync(flat, pathNames, divChaos, exChaos).ConfigureAwait(false);
@@ -1003,6 +1027,7 @@ namespace GameHelper.Data
             {
                 var url = $"https://poe.ninja/poe2/api/economy/stash/current/item/overview?league={leagueParam}&type={type}";
                 exChaos = await FetchNinjaStashApi(url, flat, pathNames, divChaos, exChaos).ConfigureAwait(false);
+                StepFetch();
             }
 
             return new RatePair(divChaos, exChaos);

@@ -20,6 +20,8 @@ namespace GameHelper.Data
 
         private static readonly string[] Locales = { "us", "cn", "tw" };
 
+        internal static int PageCount => Categories.Length * Locales.Length;
+
         private static readonly Regex SlugHref = new(
             @"href=""/(?:us|cn|tw)/([A-Za-z0-9_'\-]+)""",
             RegexOptions.Compiled);
@@ -30,25 +32,20 @@ namespace GameHelper.Data
 
         private static readonly HttpClient Http = CreateHttp();
 
-        public static async Task<Dictionary<string, (string ZhCn, string ZhTw)>> FetchEnglishToLocalAsync()
+        public static async Task<Dictionary<string, (string ZhCn, string ZhTw)>> FetchEnglishToLocalAsync(
+            Action? onPage = null)
         {
             var bySlug = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+            var jobs = new List<Task>();
             foreach (var category in Categories)
             {
                 foreach (var locale in Locales)
                 {
-                    try
-                    {
-                        var html = await Http.GetStringAsync($"https://poe2db.tw/{locale}/{category}").ConfigureAwait(false);
-                        Merge(bySlug, locale, ParsePage(html));
-                    }
-                    catch
-                    {
-                    }
-
-                    await Task.Delay(150).ConfigureAwait(false);
+                    jobs.Add(FetchPageAsync(bySlug, category, locale, onPage));
                 }
             }
+
+            await Task.WhenAll(jobs).ConfigureAwait(false);
 
             var map = new Dictionary<string, (string ZhCn, string ZhTw)>(StringComparer.OrdinalIgnoreCase);
             foreach (var rec in bySlug.Values)
@@ -111,6 +108,28 @@ namespace GameHelper.Data
             }
 
             return names;
+        }
+
+        private static async Task FetchPageAsync(
+            Dictionary<string, Dictionary<string, string>> bySlug,
+            string category,
+            string locale,
+            Action? onPage)
+        {
+            try
+            {
+                var html = await Poe2dbHttp.GetHtmlAsync(Http, $"https://poe2db.tw/{locale}/{category}")
+                    .ConfigureAwait(false);
+                lock (bySlug)
+                {
+                    Merge(bySlug, locale, ParsePage(html));
+                }
+            }
+            catch
+            {
+            }
+
+            onPage?.Invoke();
         }
 
         private static void Merge(

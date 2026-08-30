@@ -685,6 +685,31 @@ namespace StashUtilityPlus
 
         internal static void SelfCheck()
         {
+            var saved = Mods;
+            Mods =
+            [
+                new ModInfo("TowerDroppedItemRarityIncrease", "% increased Rarity of Items found in Map", "稀有度", "稀有度"),
+                new ModInfo("TowerMonsterEffectiveness", "Monsters have % increased Effectiveness", "效用", "效用"),
+            ];
+            try
+            {
+                CheckMatchRules();
+            }
+            finally
+            {
+                Mods = saved;
+            }
+
+            if (!TypeMatch(new List<string>(), "BreachAugment") ||
+                !TypeMatch(new List<string> { "BreachAugment", "AbyssAugment" }, "AbyssAugment") ||
+                TypeMatch(new List<string> { "BreachAugment" }, "AbyssAugment"))
+            {
+                throw new InvalidOperationException("type");
+            }
+        }
+
+        private static void CheckMatchRules()
+        {
             string[] a = ["A"];
             string[] ab = ["A", "B"];
             string[] rarity = ["TowerDroppedItemRarityIncrease3"];
@@ -706,13 +731,6 @@ namespace StashUtilityPlus
                 Match(new RuleExpr { Mod = "TowerDropped" }, rarity))
             {
                 throw new InvalidOperationException("match");
-            }
-
-            if (!TypeMatch(new List<string>(), "BreachAugment") ||
-                !TypeMatch(new List<string> { "BreachAugment", "AbyssAugment" }, "AbyssAugment") ||
-                TypeMatch(new List<string> { "BreachAugment" }, "AbyssAugment"))
-            {
-                throw new InvalidOperationException("type");
             }
         }
 

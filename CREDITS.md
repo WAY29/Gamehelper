@@ -49,7 +49,7 @@ Open **Plugins** in the GameHelper menu (top bar). The plugin table shows each p
 
 ## Third-party libraries
 
-Includes (non-exhaustive): ImGui.NET, ClickableTransparentOverlay, Newtonsoft.Json, Coroutine, GameOffsets, AsmResolver, Vortice, SixLabors.ImageSharp, and NuGet dependencies listed in each project's `.csproj`.
+Includes (non-exhaustive): ImGui.NET, ClickableTransparentOverlay, Newtonsoft.Json, Coroutine, GameOffsets, AsmResolver, Vortice, SixLabors.ImageSharp, [LibGGPK3](https://github.com/aianlinb/LibGGPK3) (vendored under `third_party/LibGGPK3/`, AGPL-3.0), and NuGet dependencies listed in each project's `.csproj`.
 
 ## License
 

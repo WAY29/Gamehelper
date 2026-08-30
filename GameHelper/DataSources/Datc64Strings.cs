@@ -54,6 +54,20 @@ namespace GameHelper.Data
         {
             var ids = new List<string>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
+            CollectModIds(data, ids, seen);
+            if (data.Length > 1)
+            {
+                CollectModIds(data[1..], ids, seen);
+            }
+
+            return ids;
+        }
+
+        private static void CollectModIds(
+            ReadOnlySpan<byte> data,
+            List<string> ids,
+            HashSet<string> seen)
+        {
             foreach (var s in ReadUtf16Strings(data))
             {
                 if (!LooksLikeModId(s) || !seen.Add(s))
@@ -63,8 +77,6 @@ namespace GameHelper.Data
 
                 ids.Add(s);
             }
-
-            return ids;
         }
 
         public static List<string> ParseModFamilies(ReadOnlySpan<byte> data)
@@ -319,6 +331,13 @@ namespace GameHelper.Data
             if (FamilyId("TowerDroppedItemRarityIncrease1") != "TowerDroppedItemRarityIncrease")
             {
                 throw new InvalidOperationException("datc64 family");
+            }
+
+            var odd = new List<byte> { 0xFF };
+            odd.AddRange(Utf16("TowerDroppedItemRarityIncrease3"));
+            if (!ParseModIds(odd.ToArray()).Contains("TowerDroppedItemRarityIncrease3"))
+            {
+                throw new InvalidOperationException("datc64 mods");
             }
 
             var areas = ParseWorldAreas(Utf16("MapHiddenGrotto", "Hidden Grotto", "G1_1", "The Riverbank"));
