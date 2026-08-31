@@ -1,0 +1,21 @@
+{
+  "plugin.description": "Reforge matching inventory items on the Reforging Bench",
+  "settings.hotkey": "Toggle hotkey",
+  "settings.enable": "Enable",
+  "settings.none": "(none)",
+  "settings.hover_delay": "Hover delay (ms)",
+  "settings.click_delay": "Click delay (ms)",
+  "settings.reforge_wait": "Wait for result (ms)",
+  "settings.abort_px": "Mouse abort (px)",
+  "settings.debug": "Show debug inspector",
+  "settings.log": "Show action log",
+  "settings.target": "Item type",
+  "settings.add_target": "Select tablet",
+  "settings.pick": "Pick from inventory",
+  "settings.pick_hint": "Click an inventory item",
+  "settings.idle": "Idle. Open inventory + reforging bench, press hotkey.",
+  "settings.running": "Running: {0}",
+  "settings.matched": "Matching in inventory: {0}",
+  "window.debug": "ReforgeHelper Debug",
+  "window.log": "ReforgeHelper Log"
+}

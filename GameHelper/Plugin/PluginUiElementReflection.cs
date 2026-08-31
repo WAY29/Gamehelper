@@ -118,12 +118,15 @@ namespace GameHelper.Plugin
         ///     Plugin-created parent caches are intentionally empty, so relying on
         ///     <c>UiElementBase.Position</c> can return only the element's local position.
         /// </summary>
-        public static bool TryGetAbsoluteRect(IntPtr address, out Vector2 position, out Vector2 size)
+        public static bool TryGetAbsoluteRect(IntPtr address, out Vector2 position, out Vector2 size) =>
+            TryGetAbsoluteRect(address, out position, out size, requireVisible: true);
+
+        public static bool TryGetAbsoluteRect(IntPtr address, out Vector2 position, out Vector2 size, bool requireVisible)
         {
             position = Vector2.Zero;
             size = Vector2.Zero;
 
-            if (!TryGetUnscaledPosition(address, 0, out var unscaledPosition, out var data))
+            if (!TryGetUnscaledPosition(address, 0, requireVisible, out var unscaledPosition, out var data))
             {
                 return false;
             }
@@ -141,6 +144,7 @@ namespace GameHelper.Plugin
         private static bool TryGetUnscaledPosition(
             IntPtr address,
             int depth,
+            bool requireVisible,
             out Vector2 position,
             out UiElementBaseOffset data)
         {
@@ -155,8 +159,12 @@ namespace GameHelper.Plugin
             {
                 return false;
             }
-            if ((data.Self != IntPtr.Zero && data.Self != address) ||
-                !UiElementBaseFuncs.IsVisibleChecker(data.Flags))
+            if (data.Self != IntPtr.Zero && data.Self != address)
+            {
+                return false;
+            }
+
+            if (requireVisible && !UiElementBaseFuncs.IsVisibleChecker(data.Flags))
             {
                 return false;
             }
@@ -168,7 +176,7 @@ namespace GameHelper.Plugin
                 return true;
             }
 
-            if (!TryGetUnscaledPosition(data.ParentPtr, depth + 1, out var parentPosition, out var parentData))
+            if (!TryGetUnscaledPosition(data.ParentPtr, depth + 1, requireVisible, out var parentPosition, out var parentData))
             {
                 return false;
             }

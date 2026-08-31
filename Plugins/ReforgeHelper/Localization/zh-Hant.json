@@ -1,0 +1,21 @@
+{
+  "plugin.description": "在重鑄台上重鑄背包中相同類型的物品",
+  "settings.hotkey": "開關熱鍵",
+  "settings.enable": "啟用",
+  "settings.none": "（無）",
+  "settings.hover_delay": "懸停延遲（毫秒）",
+  "settings.click_delay": "點擊延遲（毫秒）",
+  "settings.reforge_wait": "等待結果（毫秒）",
+  "settings.abort_px": "滑鼠偏移停止（像素）",
+  "settings.debug": "顯示除錯視窗",
+  "settings.log": "顯示動作日誌",
+  "settings.target": "物品類型",
+  "settings.add_target": "選擇碑牌",
+  "settings.pick": "從背包選擇",
+  "settings.pick_hint": "點擊背包中的物品",
+  "settings.idle": "閒置。打開背包和重鑄台後按熱鍵。",
+  "settings.running": "執行中：{0}",
+  "settings.matched": "背包中匹配：{0}",
+  "window.debug": "重鑄Helper 除錯",
+  "window.log": "重鑄Helper 日誌"
+}
