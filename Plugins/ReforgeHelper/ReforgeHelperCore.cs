@@ -51,6 +51,7 @@ namespace ReforgeHelper
 
         private readonly List<Slot> invSlots = new();
         private readonly List<Slot> highlights = new();
+        private readonly List<InWell> inputWells = new();
         private readonly List<Act> pending = new();
         private readonly List<string> log = new();
         private readonly List<CatalogItem> tablets = new();
@@ -79,9 +80,11 @@ namespace ReforgeHelper
 
         private string SettingPath => Path.Join(this.DllDirectory, "config", "settings.txt");
 
-        private enum ActKind { Move, Left, CtrlOn, CtrlOff, WaitOutput, WaitClear }
+        private enum ActKind { Move, Left, CtrlOn, CtrlOff, WaitOutput, WaitClear, WaitWells }
 
         private readonly record struct Act(ActKind Kind, Vector2 Pos, string Name);
+
+        private readonly record struct InWell(IntPtr Addr, Vector2 Pos, Vector2 Size, bool Occupied, int Count);
 
         private sealed class Slot
         {
@@ -92,6 +95,7 @@ namespace ReforgeHelper
             public required string InternalName;
             public string DisplayName = string.Empty;
             public bool Identified = true;
+            public int Stack = 1;
             public IntPtr El;
         }
 
@@ -410,6 +414,26 @@ namespace ReforgeHelper
                 return;
             }
 
+            if (this.inputWells.Count != 3)
+            {
+                this.Stop("输入井不是3个");
+                return;
+            }
+
+            var total = this.WellTotal();
+            if (ReforgeLogic.CanReforge(total))
+            {
+                var btn = CenterRect(this.buttonPos, this.buttonSize);
+                this.pending.Add(new Act(ActKind.Move, btn, "獻祭"));
+                this.pending.Add(new Act(ActKind.Left, btn, "重铸"));
+                this.pending.Add(new Act(ActKind.WaitOutput, default, "等结果"));
+                this.QueueTake();
+                this.status = $"重铸 {total}";
+                this.Log(this.status);
+                return;
+            }
+
+            var need = 3 - total;
             var matches = new List<NamedPos>();
             foreach (var slot in this.invSlots)
             {
@@ -418,29 +442,26 @@ namespace ReforgeHelper
                     continue;
                 }
 
-                matches.Add(new NamedPos(slot.InternalName, Center(slot)));
+                matches.Add(new NamedPos(slot.InternalName, Center(slot), slot.Stack));
                 this.highlights.Add(slot);
             }
 
-            if (!ReforgeLogic.TryTakeThree(matches, out var three))
+            if (!ReforgeLogic.TryTakeUntil(matches, need, out var taken))
             {
-                this.Stop("少于3个");
+                this.Stop($"少于{need}个");
                 return;
             }
 
             this.pending.Add(new Act(ActKind.CtrlOn, default, "Ctrl"));
-            foreach (var item in three)
+            foreach (var item in taken)
             {
                 this.pending.Add(new Act(ActKind.Move, item.Pos, "背包"));
                 this.pending.Add(new Act(ActKind.Left, item.Pos, "放入"));
             }
 
             this.pending.Add(new Act(ActKind.CtrlOff, default, "Ctrl"));
-            this.pending.Add(new Act(ActKind.Move, CenterRect(this.buttonPos, this.buttonSize), "獻祭"));
-            this.pending.Add(new Act(ActKind.Left, CenterRect(this.buttonPos, this.buttonSize), "重铸"));
-            this.pending.Add(new Act(ActKind.WaitOutput, default, "等结果"));
-            this.QueueTake();
-            this.status = $"放入 3/{matches.Count}";
+            this.pending.Add(new Act(ActKind.WaitWells, default, "等补货"));
+            this.status = $"补货 {need}";
             this.Log(this.status);
         }
 
@@ -540,6 +561,28 @@ namespace ReforgeHelper
 
                     this.nextAtMs = Environment.TickCount64 + this.HoverDelay();
                     return;
+                case ActKind.WaitWells:
+                    this.FindBench();
+                    if (this.WellsReady())
+                    {
+                        this.pendingIndex++;
+                        this.Log("井已补满");
+                        break;
+                    }
+
+                    if (Environment.TickCount64 > this.waitDeadlineMs && this.waitDeadlineMs != 0)
+                    {
+                        this.Stop("补货超时");
+                        return;
+                    }
+
+                    if (this.waitDeadlineMs == 0)
+                    {
+                        this.waitDeadlineMs = Environment.TickCount64 + Math.Max(200, this.Settings.ReforgeWaitMs);
+                    }
+
+                    this.nextAtMs = Environment.TickCount64 + this.HoverDelay();
+                    return;
                 case ActKind.CtrlOn:
                     Native.Ctrl(true);
                     this.ctrlDown = true;
@@ -563,7 +606,7 @@ namespace ReforgeHelper
                     break;
             }
 
-            if (act.Kind is ActKind.WaitOutput or ActKind.WaitClear)
+            if (act.Kind is ActKind.WaitOutput or ActKind.WaitClear or ActKind.WaitWells)
             {
                 this.waitDeadlineMs = 0;
             }
@@ -605,6 +648,7 @@ namespace ReforgeHelper
             this.hasOutput = false;
             this.outputHasItem = false;
             this.benchPanel = IntPtr.Zero;
+            this.inputWells.Clear();
             if (!this.EnsureMem())
             {
                 this.benchNote = "memory";
@@ -709,6 +753,95 @@ namespace ReforgeHelper
             this.TryAddrRect(addr, out _, out var size) &&
             IsOutputSize(size);
 
+        private int WellTotal()
+        {
+            var total = 0;
+            foreach (var well in this.inputWells)
+            {
+                total += well.Count;
+            }
+
+            return total;
+        }
+
+        private bool WellsReady() =>
+            this.inputWells.Count == 3 && ReforgeLogic.CanReforge(this.WellTotal());
+
+        private void ScanInputWells()
+        {
+            this.inputWells.Clear();
+            if (this.benchPanel == IntPtr.Zero || !this.hasOutput)
+            {
+                return;
+            }
+
+            var row = this.ResolvePath(this.benchPanel, new[] { 3, 1 });
+            if (row == IntPtr.Zero)
+            {
+                return;
+            }
+
+            var addrs = new List<IntPtr>();
+            var rects = new List<WellRect>();
+            foreach (var kid in this.ReadVec(this.ReadUi(row).ChildrensPtr))
+            {
+                var well = IntPtr.Zero;
+                if (this.IsWell(kid))
+                {
+                    well = kid;
+                }
+                else
+                {
+                    var inner = this.ResolvePath(kid, new[] { 0 });
+                    if (this.IsWell(inner))
+                    {
+                        well = inner;
+                    }
+                }
+
+                if (well == IntPtr.Zero ||
+                    !this.TryAddrRect(well, out var pos, out var size) ||
+                    this.OverlapsInventory(pos, size))
+                {
+                    continue;
+                }
+
+                addrs.Add(well);
+                rects.Add(new WellRect(pos, size));
+            }
+
+            if (!ReforgeLogic.TryPickThreeInputs(
+                    rects,
+                    new WellRect(this.outputPos, this.outputSize),
+                    out var idx))
+            {
+                return;
+            }
+
+            foreach (var i in idx)
+            {
+                var item = this.FindItemPtr(addrs[i], 2);
+                var occupied = item != IntPtr.Zero &&
+                    PluginUiElementReflection.TryValidateItemAddress(item, out _, out _);
+                int? stack = null;
+                if (occupied)
+                {
+                    var parsed = ReadItem(item);
+                    if (parsed != null && parsed.TryGetComponent<Stack>(out var st))
+                    {
+                        stack = st.Count;
+                    }
+                }
+
+                this.inputWells.Add(new InWell(
+                    addrs[i],
+                    rects[i].Pos,
+                    rects[i].Size,
+                    occupied,
+                    ReforgeLogic.StackCount(occupied, stack)));
+            }
+        }
+
         private bool AcceptAddrs(IntPtr panel, IntPtr button, IntPtr output, string tag)
         {
             if (button == IntPtr.Zero || output == IntPtr.Zero)
@@ -735,7 +868,8 @@ namespace ReforgeHelper
             var item = this.FindItemPtr(output, 2);
             this.outputHasItem = item != IntPtr.Zero &&
                 PluginUiElementReflection.TryValidateItemAddress(item, out _, out _);
-            this.benchNote = $"{tag} btn=({this.buttonPos.X:0},{this.buttonPos.Y:0}) {this.buttonSize.X:0}x{this.buttonSize.Y:0}";
+            this.ScanInputWells();
+            this.benchNote = $"{tag} btn=({this.buttonPos.X:0},{this.buttonPos.Y:0}) {this.buttonSize.X:0}x{this.buttonSize.Y:0} wells={this.inputWells.Count}";
             return true;
         }
 
@@ -1020,6 +1154,12 @@ namespace ReforgeHelper
                 internalName = slash >= 0 ? path[(slash + 1)..] : path;
             }
 
+            int? stack = null;
+            if (item.TryGetComponent<Stack>(out var st))
+            {
+                stack = st.Count;
+            }
+
             this.invSlots.Add(new Slot
             {
                 Item = item,
@@ -1029,6 +1169,7 @@ namespace ReforgeHelper
                 InternalName = internalName,
                 DisplayName = b?.BaseItemName ?? internalName,
                 Identified = this.ReadIdentified(item),
+                Stack = ReforgeLogic.StackCount(true, stack),
                 El = slot,
             });
         }
@@ -1122,20 +1263,24 @@ namespace ReforgeHelper
 
         private void DrawHighlights()
         {
-            var dl = ImGui.GetForegroundDrawList();
             foreach (var slot in this.highlights)
             {
-                dl.AddRect(slot.Pos, slot.Pos + slot.Size, 0xFF00FF00, 0f, ImDrawFlags.None, 2f);
+                ImGuiHelper.DrawRect(slot.Pos, slot.Size, 0, 220, 80);
             }
 
             if (this.hasButton)
             {
-                ImGuiHelper.DrawRect(this.buttonPos, this.buttonSize, 255, 255, 0);
+                ImGuiHelper.DrawRect(this.buttonPos, this.buttonSize, 0, 220, 80);
             }
 
             if (this.hasOutput)
             {
-                ImGuiHelper.DrawRect(this.outputPos, this.outputSize, 0, 160, 255);
+                ImGuiHelper.DrawRect(this.outputPos, this.outputSize, 0, 220, 80);
+            }
+
+            foreach (var well in this.inputWells)
+            {
+                ImGuiHelper.DrawRect(well.Pos, well.Size, 0, 220, 80);
             }
         }
 
@@ -1165,7 +1310,7 @@ namespace ReforgeHelper
             }
 
             ImGui.Checkbox("Freeze hovered", ref this.freezeHover);
-            ImGui.Text($"Inv {this.invSlots.Count}  bench={(this.benchPanel != IntPtr.Zero)}  outputItem={this.outputHasItem}");
+            ImGui.Text($"Inv {this.invSlots.Count}  bench={(this.benchPanel != IntPtr.Zero)}  outputItem={this.outputHasItem}  wells={this.inputWells.Count}  sum={this.WellTotal()}");
             ImGui.Text("bench " + this.benchNote);
             ImGui.Text($"Target {this.Settings.TargetInternalName}");
             ImGui.Text($"Status {this.status}");
@@ -1177,6 +1322,12 @@ namespace ReforgeHelper
             if (this.hasOutput)
             {
                 ImGui.Text($"Output {this.outputPos} {this.outputSize}");
+            }
+
+            for (var i = 0; i < this.inputWells.Count; i++)
+            {
+                var well = this.inputWells[i];
+                ImGui.Text($"In{i} n={well.Count} occ={well.Occupied} addr={well.Addr:X} {well.Pos} {well.Size}");
             }
 
             if (this.lastHovered != null)
@@ -1300,7 +1451,8 @@ namespace ReforgeHelper
 
         private string ResolveTargetId(Slot slot)
         {
-            if (ItemCatalog.TryGet(slot.InternalName, out var byId) && byId != null)
+            if (!string.IsNullOrEmpty(slot.InternalName) &&
+                ItemCatalog.TryGet(slot.InternalName, out var byId) && byId != null)
             {
                 return byId.InternalName;
             }
@@ -1311,18 +1463,7 @@ namespace ReforgeHelper
                 return byTail.InternalName;
             }
 
-            foreach (var row in this.tablets)
-            {
-                if (ReforgeLogic.Matches(row.InternalName, slot.InternalName, slot.Path, slot.DisplayName) ||
-                    ReforgeLogic.Matches(row.English, slot.DisplayName) ||
-                    ReforgeLogic.Matches(row.ZhTw, slot.DisplayName) ||
-                    ReforgeLogic.Matches(row.ZhCn, slot.DisplayName))
-                {
-                    return row.InternalName;
-                }
-            }
-
-            return string.IsNullOrEmpty(tail) ? slot.InternalName : tail;
+            return string.IsNullOrEmpty(slot.InternalName) ? tail : slot.InternalName;
         }
 
         private bool TryResolveCatalog(string id, out CatalogItem? item)
