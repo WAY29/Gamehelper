@@ -2,6 +2,7 @@ namespace GameHelper.Data
 {
     using System;
     using System.Collections.Generic;
+    using System.Net;
     using System.Net.Http;
     using System.Text.RegularExpressions;
     using System.Threading.Tasks;
@@ -22,15 +23,22 @@ namespace GameHelper.Data
 
         internal static int PageCount => Categories.Length * Locales.Length;
 
-        private static readonly Regex SlugHref = new(
-            @"href=""/(?:us|cn|tw)/([A-Za-z0-9_'\-]+)""",
-            RegexOptions.Compiled);
-
         private static readonly Regex UniqueName = new(
             @"class=""[^""]*uniqueName[^""]*""[^>]*>([^<]+)",
             RegexOptions.Compiled);
 
+        private static readonly Regex Anchor = new(
+            @"<a\b[^>]*href=""(?:/(?:us|cn|tw)/)?([A-Za-z0-9_'\-]+)""[^>]*>(.*?)</a>",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+        private static readonly Regex Tags = new("<[^>]+>", RegexOptions.Compiled);
+
         private static readonly HttpClient Http = CreateHttp();
+
+        static Poe2dbNames()
+        {
+            SelfCheck();
+        }
 
         public static async Task<Dictionary<string, (string ZhCn, string ZhTw)>> FetchEnglishToLocalAsync(
             Action? onPage = null)
@@ -90,24 +98,61 @@ namespace GameHelper.Data
                 names[SlugFromName(name)] = name;
             }
 
-            foreach (Match m in SlugHref.Matches(html))
+            foreach (Match m in Anchor.Matches(html))
             {
                 var slug = m.Groups[1].Value;
-                if (slug is "Items" or "Unique_item" or "Gem")
+                if (IsSkippedSlug(slug))
                 {
                     continue;
                 }
 
-                if (names.ContainsKey(slug))
+                var text = Collapse(Tags.Replace(m.Groups[2].Value, " "));
+                if (text.Length == 0)
                 {
                     continue;
                 }
 
-                var decoded = slug.Replace('_', ' ');
-                names[slug] = decoded;
+                if (!names.TryGetValue(slug, out var old) || text.Length > old.Length)
+                {
+                    names[slug] = text;
+                }
             }
 
             return names;
+        }
+
+        private static bool IsSkippedSlug(string slug)
+        {
+            if (slug is "Items" or "Unique_item" or "Gem" or "Modifiers" or "Keywords")
+            {
+                return true;
+            }
+
+            foreach (var category in Categories)
+            {
+                if (category.Equals(slug, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        internal static void SelfCheck()
+        {
+            var parsed = ParsePage(
+                "<a href=\"Flesh_Catalyst\"><img alt=\"BreachCatalystLife\" class=\"w1\" /></a>" +
+                "<a href=\"Flesh_Catalyst\"><img />血肉催化剂</a>" +
+                "<a href=\"/us/Uul-Netols_Catalyst\">Uul-Netol's Catalyst</a>" +
+                "<a href=\"Catalysts\">催化剂</a>");
+            if (parsed.Count != 2 ||
+                parsed["Flesh_Catalyst"] != "血肉催化剂" ||
+                parsed["Uul-Netols_Catalyst"] != "Uul-Netol's Catalyst" ||
+                parsed.ContainsKey("Catalysts"))
+            {
+                throw new InvalidOperationException("poe2db list pages must keep visible names, not slugs");
+            }
         }
 
         private static async Task FetchPageAsync(
@@ -175,6 +220,7 @@ namespace GameHelper.Data
 
         private static string Collapse(string text)
         {
+            text = WebUtility.HtmlDecode(text);
             return string.Join(' ', text.Split((char[])null, StringSplitOptions.RemoveEmptyEntries));
         }
     }

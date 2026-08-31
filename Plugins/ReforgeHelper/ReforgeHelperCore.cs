@@ -190,8 +190,16 @@ namespace ReforgeHelper
             ImGui.SetNextItemWidth(280);
             if (ImGui.BeginCombo("##RHTarget", this.TargetPreview()))
             {
+                var lastGroup = int.MinValue;
                 foreach (var row in this.tablets)
                 {
+                    var group = ReforgeLogic.PresetGroup(row.Path);
+                    if (group != lastGroup)
+                    {
+                        ImGui.SeparatorText(this.PresetGroupLabel(group));
+                        lastGroup = group;
+                    }
+
                     if (ImGui.Selectable(this.ItemLabel(row), this.IsTarget(row.InternalName)))
                     {
                         this.Settings.TargetInternalName = row.InternalName;
@@ -316,6 +324,7 @@ namespace ReforgeHelper
             ImGui.Checkbox($"Shift##{id}_shift", ref binding.Shift);
             var none = this.PluginText.T("settings.none", "(none)");
             var preview = binding.Key == 0 ? none : this.KeyLabel(binding.Key);
+            ImGui.SetNextItemWidth(120);
             if (ImGui.BeginCombo($"Key##{id}_key", preview))
             {
                 if (ImGui.Selectable(none, binding.Key == 0))
@@ -1375,20 +1384,31 @@ namespace ReforgeHelper
         {
             ItemCatalog.Touch();
             this.tablets.Clear();
-            foreach (var row in ItemCatalog.ItemsWherePathContains("/TowerAugment/"))
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var fragment in ReforgeLogic.PresetPathFragments)
             {
-                if (string.IsNullOrEmpty(row.InternalName) ||
-                    (string.IsNullOrEmpty(row.English) &&
-                     string.IsNullOrEmpty(row.ZhCn) &&
-                     string.IsNullOrEmpty(row.ZhTw)))
+                foreach (var row in ItemCatalog.ItemsWherePathContains(fragment))
                 {
-                    continue;
-                }
+                    if (string.IsNullOrEmpty(row.InternalName) ||
+                        (string.IsNullOrEmpty(row.English) &&
+                         string.IsNullOrEmpty(row.ZhCn) &&
+                         string.IsNullOrEmpty(row.ZhTw)) ||
+                        !seen.Add(row.InternalName))
+                    {
+                        continue;
+                    }
 
-                this.tablets.Add(row);
+                    this.tablets.Add(row);
+                }
             }
 
-            this.tablets.Sort((a, b) => string.Compare(this.ItemLabel(a), this.ItemLabel(b), StringComparison.OrdinalIgnoreCase));
+            this.tablets.Sort((a, b) =>
+            {
+                var group = ReforgeLogic.PresetGroup(a.Path).CompareTo(ReforgeLogic.PresetGroup(b.Path));
+                return group != 0
+                    ? group
+                    : string.Compare(this.ItemLabel(a), this.ItemLabel(b), StringComparison.OrdinalIgnoreCase);
+            });
         }
 
         private string TargetPreview()
@@ -1405,6 +1425,14 @@ namespace ReforgeHelper
 
             return this.Settings.TargetInternalName;
         }
+
+        private string PresetGroupLabel(int group) => group switch
+        {
+            0 => this.PluginText.T("settings.preset_tablet", "Tablets"),
+            1 => this.PluginText.T("settings.preset_catalyst", "Catalysts"),
+            2 => this.PluginText.T("settings.preset_emotion", "Liquid Emotions"),
+            _ => string.Empty,
+        };
 
         private string ItemLabel(CatalogItem row)
         {

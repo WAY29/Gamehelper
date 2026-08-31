@@ -493,11 +493,7 @@ namespace GameHelper.Data
                 {
                     if (item.English.Length > 0 && itemLoc.TryGetValue(item.English, out var loc))
                     {
-                        item.ZhCn = loc.ZhCn;
-                        if (item.ZhTw.Length == 0)
-                        {
-                            item.ZhTw = loc.ZhTw;
-                        }
+                        ApplyFetchedItemName(item, loc);
                     }
                 }
 
@@ -893,7 +889,19 @@ namespace GameHelper.Data
 
             if (item.English.Length > 0 && itemLoc.TryGetValue(item.English, out var loc))
             {
+                ApplyFetchedItemName(item, loc);
+            }
+        }
+
+        private static void ApplyFetchedItemName(CatalogItem item, CatalogText loc)
+        {
+            if (!string.IsNullOrEmpty(loc.ZhCn))
+            {
                 item.ZhCn = loc.ZhCn;
+            }
+
+            if (item.ZhTw.Length == 0 && !string.IsNullOrEmpty(loc.ZhTw))
+            {
                 item.ZhTw = loc.ZhTw;
             }
         }

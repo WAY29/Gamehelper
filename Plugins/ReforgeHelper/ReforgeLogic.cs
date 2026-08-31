@@ -45,6 +45,42 @@ namespace ReforgeHelper
 
         public static bool ShouldFeed(bool identified) => identified;
 
+        internal static readonly string[] PresetPathFragments =
+        {
+            "/TowerAugment/",
+            "CurrencyJewelleryQuality",
+            "CurrencyJewelQuality",
+            "DistilledEmotion",
+        };
+
+        public static bool IsPresetPath(string path) => PresetGroup(path) < int.MaxValue;
+
+        public static int PresetGroup(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return int.MaxValue;
+            }
+
+            if (path.Contains("/TowerAugment/", StringComparison.OrdinalIgnoreCase))
+            {
+                return 0;
+            }
+
+            if (path.Contains("CurrencyJewelleryQuality", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains("CurrencyJewelQuality", StringComparison.OrdinalIgnoreCase))
+            {
+                return 1;
+            }
+
+            if (path.Contains("DistilledEmotion", StringComparison.OrdinalIgnoreCase))
+            {
+                return 2;
+            }
+
+            return int.MaxValue;
+        }
+
         public static int StackCount(bool hasItem, int? stack)
         {
             if (!hasItem)
@@ -190,6 +226,30 @@ namespace ReforgeHelper
                     string.Empty))
             {
                 throw new InvalidOperationException("different tablet path must not match");
+            }
+
+            if (!IsPresetPath("Metadata/Items/TowerAugment/GenericAugment") ||
+                !IsPresetPath("Metadata/Items/Currency/CurrencyJewelleryQualityLife") ||
+                !IsPresetPath("Metadata/Items/Currency/CurrencyJewelQualityLife") ||
+                !IsPresetPath("Metadata/Items/Currency/DistilledEmotion1") ||
+                !IsPresetPath("Metadata/Items/Currency/EndgameDistilledEmotionTimeLost3"))
+            {
+                throw new InvalidOperationException("tablet, catalyst, and liquid emotion paths must be presets");
+            }
+
+            if (IsPresetPath("Metadata/Items/Currency/CurrencyRerollRemnant") ||
+                IsPresetPath("Metadata/Items/Currency/CurrencyEssenceLife") ||
+                IsPresetPath("Metadata/Items/TowerAugments/TowerAugment"))
+            {
+                throw new InvalidOperationException("unrelated currency must not be a preset");
+            }
+
+            if (PresetGroup("Metadata/Items/TowerAugment/GenericAugment") != 0 ||
+                PresetGroup("Metadata/Items/Currency/CurrencyJewelleryQualityLife") != 1 ||
+                PresetGroup("Metadata/Items/Currency/CurrencyJewelQualityLife") != 1 ||
+                PresetGroup("Metadata/Items/Currency/DistilledEmotion1") != 2)
+            {
+                throw new InvalidOperationException("presets must group tablet, catalyst, then liquid emotion");
             }
 
             if (StackCount(false, 10) != 0 ||
