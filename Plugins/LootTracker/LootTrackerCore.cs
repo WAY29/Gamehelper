@@ -202,10 +202,25 @@ namespace LootTracker
             _ => "Normal",
         };
 
+        // Lookup order matches how MarketPrices actually indexes poe2scout rows: tablet rarity
+        // variant first, then metadata id / English name (LootValue's path), then GGPK art last.
+        // Scout does not key currency by GGPK art (AnnullOrb vs CurrencyRemoveMod).
+        internal static string[] PriceLookupKeys(string path, string art, int rarity)
+        {
+            var seg = LastSegment(path);
+            var variant = art + RarityVariant(rarity);
+            if (string.Equals(seg, art, StringComparison.OrdinalIgnoreCase))
+            {
+                return [variant, seg];
+            }
+
+            return [variant, seg, art];
+        }
+
         // Resolve one inventory key to its unit Exalted price and display label. Tries the per-rarity
         // art key first (tablets: Normal/Magic/Rare share an icon but list distinct prices), then the
-        // bare art id (currency, and uniques whose icon already encodes the item). Label prefers the
-        // variant's poe.ninja name, then the bare art's, then the art id itself.
+        // metadata id / English name (what poe2scout indexes), then GGPK art. Label prefers the
+        // market display name, then catalog English, then the art id.
         private bool TryPriceItem(string itemKey, out double unit, out string label)
         {
             var (rarity, path, renderArt) = SplitItemKey(itemKey);
@@ -224,18 +239,92 @@ namespace LootTracker
             }
 
             var art = this.PriceKey(path);
-            var variantKey = art + RarityVariant(rarity);
+            var seg = LastSegment(path);
+            var english = CatalogEnglish(seg);
+            unit = 0;
+            var priced = false;
+            foreach (var key in PriceLookupKeys(path, art, rarity))
+            {
+                if (MarketPrices.TryGetPriceByArtId(key, out unit) && unit > 0)
+                {
+                    priced = true;
+                    break;
+                }
+            }
 
-            bool priced;
-            if (MarketPrices.TryGetPriceByArtId(variantKey, out unit) && unit > 0) priced = true;
-            else if (MarketPrices.TryGetPriceByArtId(art, out unit) && unit > 0) priced = true;
-            else { unit = 0; priced = false; }
+            if (!priced && english.Length > 0 &&
+                MarketPrices.TryGetPriceByArtId(english, out unit) && unit > 0)
+            {
+                priced = true;
+            }
 
-            if (MarketPrices.TryGetNameByArtId(variantKey, out var nm) && nm.Length > 0) label = nm;
-            else if (MarketPrices.TryGetNameByArtId(art, out nm) && nm.Length > 0) label = nm;
-            else label = art;
+            if (!priced)
+            {
+                var found = MarketPrices.GetPrice(english, null, seg, path, seg);
+                if (found != null)
+                {
+                    var (ex, _) = MarketPrices.GetDisplayPrice(found, 1);
+                    if (ex > 0)
+                    {
+                        unit = ex;
+                        priced = true;
+                    }
+                }
+            }
 
+            if (!priced) unit = 0;
+            label = this.PriceLabel(path, art, rarity, english);
             return priced;
+        }
+
+        private static string CatalogEnglish(string internalName)
+        {
+            if (ItemCatalog.TryGet(internalName, out var item) &&
+                item != null &&
+                !string.IsNullOrEmpty(item.English))
+            {
+                return item.English;
+            }
+
+            return string.Empty;
+        }
+
+        private string PriceLabel(string path, string art, int rarity, string english)
+        {
+            foreach (var key in PriceLookupKeys(path, art, rarity))
+            {
+                if (MarketPrices.TryGetNameByArtId(key, out var nm) && nm.Length > 0)
+                {
+                    return nm;
+                }
+            }
+
+            if (english.Length > 0)
+            {
+                return english;
+            }
+
+            return art.Length > 0 ? art : LastSegment(path);
+        }
+
+        private static void SelfCheck()
+        {
+            var keys = PriceLookupKeys(
+                "Metadata/Items/Currency/CurrencyRemoveMod", "AnnullOrb", 0);
+            if (keys.Length < 2 ||
+                keys[0] != "AnnullOrbNormal" ||
+                keys[1] != "CurrencyRemoveMod" ||
+                keys[^1] != "AnnullOrb")
+            {
+                throw new InvalidOperationException("annul lookup must try metadata id, not only GGPK art");
+            }
+
+            var chaos = PriceLookupKeys(
+                "Metadata/Items/Currency/CurrencyRerollRare2", "CurrencyRerollRare", 0);
+            if (chaos.Length != 3 || chaos[1] != "CurrencyRerollRare2")
+            {
+                throw new InvalidOperationException("tiered currency must look up InternalName before shared art");
+            }
         }
 
         // Load the metaId→art bridge shipped beside the dll. Missing/garbled file is non-fatal:
@@ -257,6 +346,7 @@ namespace LootTracker
 
         public override void OnEnable(bool isGameOpened)
         {
+            SelfCheck();
             if (File.Exists(this.SettingPathname))
             {
                 var content = File.ReadAllText(this.SettingPathname);
