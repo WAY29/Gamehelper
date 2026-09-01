@@ -55,6 +55,8 @@ namespace ReforgeHelper
         private readonly List<Act> pending = new();
         private readonly List<string> log = new();
         private readonly List<CatalogItem> tablets = new();
+        private readonly List<string> runTargets = new();
+        private int runIndex;
         private int pendingIndex;
         private long nextAtMs;
         private long waitDeadlineMs;
@@ -80,11 +82,19 @@ namespace ReforgeHelper
 
         private string SettingPath => Path.Join(this.DllDirectory, "config", "settings.txt");
 
-        private enum ActKind { Move, Left, CtrlOn, CtrlOff, WaitOutput, WaitClear, WaitWells }
+        private enum ActKind { Move, Left, CtrlOn, CtrlOff, WaitOutput, WaitClear, WaitWells, WaitInputClear }
 
         private readonly record struct Act(ActKind Kind, Vector2 Pos, string Name);
 
-        private readonly record struct InWell(IntPtr Addr, Vector2 Pos, Vector2 Size, bool Occupied, int Count);
+        private readonly record struct InWell(
+            IntPtr Addr,
+            Vector2 Pos,
+            Vector2 Size,
+            bool Occupied,
+            int Count,
+            string InternalName = "",
+            string Path = "",
+            string DisplayName = "");
 
         private sealed class Slot
         {
@@ -130,6 +140,8 @@ namespace ReforgeHelper
             {
                 this.Settings.Toggle.Key = (int)VK.F7;
             }
+
+            this.EnsureTargets();
         }
 
         public override void OnDisable()
@@ -187,8 +199,26 @@ namespace ReforgeHelper
             ImGui.Separator();
             ImGui.AlignTextToFramePadding();
             ImGui.Text(this.PluginText.T("settings.target", "Item type"));
+            this.Settings.TargetInternalNames ??= new();
+            for (var i = 0; i < this.Settings.TargetInternalNames.Count; i++)
+            {
+                var id = this.Settings.TargetInternalNames[i];
+                ImGui.PushID(i);
+                ImGui.AlignTextToFramePadding();
+                ImGui.TextUnformatted($"{this.TargetLabel(id)}  {this.CountIdentified(id)}");
+                ImGui.SameLine();
+                if (ImGui.SmallButton(this.PluginText.T("settings.delete", "Delete")))
+                {
+                    this.Settings.TargetInternalNames.RemoveAt(i);
+                    ImGui.PopID();
+                    break;
+                }
+
+                ImGui.PopID();
+            }
+
             ImGui.SetNextItemWidth(280);
-            if (ImGui.BeginCombo("##RHTarget", this.TargetPreview()))
+            if (ImGui.BeginCombo("##RHTarget", this.PluginText.T("settings.add_target", "Add item type")))
             {
                 var lastGroup = int.MinValue;
                 foreach (var row in this.tablets)
@@ -200,9 +230,9 @@ namespace ReforgeHelper
                         lastGroup = group;
                     }
 
-                    if (ImGui.Selectable(this.ItemLabel(row), this.IsTarget(row.InternalName)))
+                    if (ImGui.Selectable(this.ItemLabel(row), this.ListHas(row.InternalName)))
                     {
-                        this.Settings.TargetInternalName = row.InternalName;
+                        this.AddTarget(row.InternalName);
                     }
                 }
 
@@ -221,16 +251,6 @@ namespace ReforgeHelper
                 ImGui.TextDisabled(this.PluginText.T("settings.pick_hint", "Click an inventory item"));
             }
 
-            var matched = 0;
-            foreach (var slot in this.invSlots)
-            {
-                if (this.IsSlotTarget(slot))
-                {
-                    matched++;
-                }
-            }
-
-            ImGui.Text(this.PluginText.F("settings.matched", "Matching in inventory: {0}", matched));
             ImGui.TextWrapped(this.running
                 ? this.PluginText.F("settings.running", "Running: {0}", this.status)
                 : this.PluginText.T("settings.idle", "Idle. Open inventory + reforging bench, press hotkey."));
@@ -382,18 +402,22 @@ namespace ReforgeHelper
 
         private void Start()
         {
-            if (string.IsNullOrEmpty(this.Settings.TargetInternalName))
+            this.EnsureTargets();
+            if (this.Settings.TargetInternalNames.Count == 0)
             {
                 this.status = "未选择物品类型";
                 this.Log(this.status);
                 return;
             }
 
+            this.runTargets.Clear();
+            this.runTargets.AddRange(this.Settings.TargetInternalNames);
+            this.runIndex = 0;
             this.running = true;
             this.pending.Clear();
             this.pendingIndex = 0;
             this.hasLastClick = false;
-            this.Log("开始 " + this.TargetPreview());
+            this.Log($"开始 {this.TargetLabel(this.runTargets[0])} 1/{this.runTargets.Count}");
             this.PlanCycle();
         }
 
@@ -416,62 +440,92 @@ namespace ReforgeHelper
                 return;
             }
 
-            if (this.outputHasItem && this.hasOutput)
+            while (this.running && this.pending.Count == 0)
             {
-                this.QueueTake();
-                this.status = "取出结果";
-                return;
-            }
-
-            if (this.inputWells.Count != 3)
-            {
-                this.Stop("输入井不是3个");
-                return;
-            }
-
-            var total = this.WellTotal();
-            if (ReforgeLogic.CanReforge(total))
-            {
-                var btn = CenterRect(this.buttonPos, this.buttonSize);
-                this.pending.Add(new Act(ActKind.Move, btn, "獻祭"));
-                this.pending.Add(new Act(ActKind.Left, btn, "重铸"));
-                this.pending.Add(new Act(ActKind.WaitOutput, default, "等结果"));
-                this.QueueTake();
-                this.status = $"重铸 {total}";
-                this.Log(this.status);
-                return;
-            }
-
-            var need = 3 - total;
-            var matches = new List<NamedPos>();
-            foreach (var slot in this.invSlots)
-            {
-                if (!slot.Identified || !this.IsSlotTarget(slot))
+                if (this.runIndex >= this.runTargets.Count)
                 {
-                    continue;
+                    this.Stop("全部类型已用完");
+                    return;
                 }
 
-                matches.Add(new NamedPos(slot.InternalName, Center(slot), slot.Stack));
-                this.highlights.Add(slot);
-            }
+                if (this.outputHasItem && this.hasOutput)
+                {
+                    this.QueueTake();
+                    this.status = "取出结果";
+                    return;
+                }
 
-            if (!ReforgeLogic.TryTakeUntil(matches, need, out var taken))
-            {
-                this.Stop($"少于{need}个");
-                return;
-            }
+                if (this.inputWells.Count != 3)
+                {
+                    this.Stop("输入井不是3个");
+                    return;
+                }
 
-            this.pending.Add(new Act(ActKind.CtrlOn, default, "Ctrl"));
-            foreach (var item in taken)
-            {
-                this.pending.Add(new Act(ActKind.Move, item.Pos, "背包"));
-                this.pending.Add(new Act(ActKind.Left, item.Pos, "放入"));
-            }
+                var target = this.CurrentTarget();
+                if (this.NeedsDumpNonCurrent(target))
+                {
+                    this.QueueDumpWells();
+                    this.status = "取出非当前类型 " + this.TargetLabel(target);
+                    this.Log(this.status);
+                    return;
+                }
 
-            this.pending.Add(new Act(ActKind.CtrlOff, default, "Ctrl"));
-            this.pending.Add(new Act(ActKind.WaitWells, default, "等补货"));
-            this.status = $"补货 {need}";
-            this.Log(this.status);
+                var total = this.WellTotal();
+                if (ReforgeLogic.CanReforge(total))
+                {
+                    var btn = CenterRect(this.buttonPos, this.buttonSize);
+                    this.pending.Add(new Act(ActKind.Move, btn, "獻祭"));
+                    this.pending.Add(new Act(ActKind.Left, btn, "重铸"));
+                    this.pending.Add(new Act(ActKind.WaitOutput, default, "等结果"));
+                    this.QueueTake();
+                    this.status = $"重铸 {this.TargetLabel(target)} {total}";
+                    this.Log(this.status);
+                    return;
+                }
+
+                var need = 3 - total;
+                var matches = new List<NamedPos>();
+                foreach (var slot in this.invSlots)
+                {
+                    if (!slot.Identified || !this.IsSlotTarget(target, slot))
+                    {
+                        continue;
+                    }
+
+                    matches.Add(new NamedPos(slot.InternalName, Center(slot), slot.Stack));
+                    this.highlights.Add(slot);
+                }
+
+                if (ReforgeLogic.TryTakeUntil(matches, need, out var taken))
+                {
+                    this.pending.Add(new Act(ActKind.CtrlOn, default, "Ctrl"));
+                    foreach (var item in taken)
+                    {
+                        this.pending.Add(new Act(ActKind.Move, item.Pos, "背包"));
+                        this.pending.Add(new Act(ActKind.Left, item.Pos, "放入"));
+                    }
+
+                    this.pending.Add(new Act(ActKind.CtrlOff, default, "Ctrl"));
+                    this.pending.Add(new Act(ActKind.WaitWells, default, "等补货"));
+                    this.status = $"补货 {this.TargetLabel(target)} {need}";
+                    this.Log(this.status);
+                    return;
+                }
+
+                if (this.HasOccupiedWells())
+                {
+                    this.QueueDumpWells();
+                    this.runIndex++;
+                    this.status = this.runIndex >= this.runTargets.Count
+                        ? "取出残留后结束"
+                        : "取出残留 → " + this.TargetLabel(this.CurrentTarget());
+                    this.Log(this.status);
+                    return;
+                }
+
+                this.Log($"跳过 {this.TargetLabel(target)} 少于{need}个");
+                this.runIndex++;
+            }
         }
 
         private void QueueTake()
@@ -481,6 +535,25 @@ namespace ReforgeHelper
             this.pending.Add(new Act(ActKind.Left, CenterRect(this.outputPos, this.outputSize), "取出"));
             this.pending.Add(new Act(ActKind.CtrlOff, default, "Ctrl"));
             this.pending.Add(new Act(ActKind.WaitClear, default, "等清空"));
+        }
+
+        private void QueueDumpWells()
+        {
+            this.pending.Add(new Act(ActKind.CtrlOn, default, "Ctrl"));
+            foreach (var well in this.inputWells)
+            {
+                if (!well.Occupied)
+                {
+                    continue;
+                }
+
+                var pos = CenterRect(well.Pos, well.Size);
+                this.pending.Add(new Act(ActKind.Move, pos, "井"));
+                this.pending.Add(new Act(ActKind.Left, pos, "取出残留"));
+            }
+
+            this.pending.Add(new Act(ActKind.CtrlOff, default, "Ctrl"));
+            this.pending.Add(new Act(ActKind.WaitInputClear, default, "等井空"));
         }
 
         private void Tick()
@@ -592,6 +665,29 @@ namespace ReforgeHelper
 
                     this.nextAtMs = Environment.TickCount64 + this.HoverDelay();
                     return;
+                case ActKind.WaitInputClear:
+                    this.FindBench();
+                    if (this.WellTotal() == 0)
+                    {
+                        this.pendingIndex++;
+                        this.waitDeadlineMs = 0;
+                        this.Log("残留已取出");
+                        break;
+                    }
+
+                    if (Environment.TickCount64 > this.waitDeadlineMs && this.waitDeadlineMs != 0)
+                    {
+                        this.Stop("取出残留超时");
+                        return;
+                    }
+
+                    if (this.waitDeadlineMs == 0)
+                    {
+                        this.waitDeadlineMs = Environment.TickCount64 + Math.Max(200, this.Settings.ReforgeWaitMs);
+                    }
+
+                    this.nextAtMs = Environment.TickCount64 + this.HoverDelay();
+                    return;
                 case ActKind.CtrlOn:
                     Native.Ctrl(true);
                     this.ctrlDown = true;
@@ -615,7 +711,7 @@ namespace ReforgeHelper
                     break;
             }
 
-            if (act.Kind is ActKind.WaitOutput or ActKind.WaitClear or ActKind.WaitWells)
+            if (act.Kind is ActKind.WaitOutput or ActKind.WaitClear or ActKind.WaitWells or ActKind.WaitInputClear)
             {
                 this.waitDeadlineMs = 0;
             }
@@ -830,15 +926,27 @@ namespace ReforgeHelper
             foreach (var i in idx)
             {
                 var item = this.FindItemPtr(addrs[i], 2);
+                var path = string.Empty;
                 var occupied = item != IntPtr.Zero &&
-                    PluginUiElementReflection.TryValidateItemAddress(item, out _, out _);
+                    PluginUiElementReflection.TryValidateItemAddress(item, out path, out _);
                 int? stack = null;
+                var internalName = string.Empty;
+                var displayName = string.Empty;
                 if (occupied)
                 {
                     var parsed = ReadItem(item);
-                    if (parsed != null && parsed.TryGetComponent<Stack>(out var st))
+                    if (parsed != null)
                     {
-                        stack = st.Count;
+                        if (parsed.TryGetComponent<Stack>(out var st))
+                        {
+                            stack = st.Count;
+                        }
+
+                        if (parsed.TryGetComponent<Base>(out var b))
+                        {
+                            internalName = b.InternalName ?? string.Empty;
+                            displayName = b.BaseItemName ?? string.Empty;
+                        }
                     }
                 }
 
@@ -847,7 +955,10 @@ namespace ReforgeHelper
                     rects[i].Pos,
                     rects[i].Size,
                     occupied,
-                    ReforgeLogic.StackCount(occupied, stack)));
+                    ReforgeLogic.StackCount(occupied, stack),
+                    internalName,
+                    path ?? string.Empty,
+                    displayName));
             }
         }
 
@@ -1230,8 +1341,7 @@ namespace ReforgeHelper
             if (this.lastHovered != null)
             {
                 this.RefreshTablets();
-                this.Settings.TargetInternalName = this.ResolveTargetId(this.lastHovered);
-                this.Log("目标 " + this.TargetPreview());
+                this.AddTarget(this.ResolveTargetId(this.lastHovered));
             }
 
             this.EndPick();
@@ -1321,7 +1431,7 @@ namespace ReforgeHelper
             ImGui.Checkbox("Freeze hovered", ref this.freezeHover);
             ImGui.Text($"Inv {this.invSlots.Count}  bench={(this.benchPanel != IntPtr.Zero)}  outputItem={this.outputHasItem}  wells={this.inputWells.Count}  sum={this.WellTotal()}");
             ImGui.Text("bench " + this.benchNote);
-            ImGui.Text($"Target {this.Settings.TargetInternalName}");
+            ImGui.Text($"Target {string.Join(", ", this.Settings.TargetInternalNames)}  run={this.runIndex}/{this.runTargets.Count}");
             ImGui.Text($"Status {this.status}");
             if (this.hasButton)
             {
@@ -1336,7 +1446,7 @@ namespace ReforgeHelper
             for (var i = 0; i < this.inputWells.Count; i++)
             {
                 var well = this.inputWells[i];
-                ImGui.Text($"In{i} n={well.Count} occ={well.Occupied} addr={well.Addr:X} {well.Pos} {well.Size}");
+                ImGui.Text($"In{i} n={well.Count} occ={well.Occupied} {well.InternalName} addr={well.Addr:X} {well.Pos} {well.Size}");
             }
 
             if (this.lastHovered != null)
@@ -1411,19 +1521,24 @@ namespace ReforgeHelper
             });
         }
 
-        private string TargetPreview()
+        private string CurrentTarget() =>
+            this.runIndex >= 0 && this.runIndex < this.runTargets.Count
+                ? this.runTargets[this.runIndex]
+                : string.Empty;
+
+        private string TargetLabel(string id)
         {
-            if (string.IsNullOrEmpty(this.Settings.TargetInternalName))
+            if (string.IsNullOrEmpty(id))
             {
-                return this.PluginText.T("settings.add_target", "Select tablet");
+                return this.PluginText.T("settings.none", "(none)");
             }
 
-            if (this.TryResolveCatalog(this.Settings.TargetInternalName, out var item) && item != null)
+            if (this.TryResolveCatalog(id, out var item) && item != null)
             {
                 return this.ItemLabel(item);
             }
 
-            return this.Settings.TargetInternalName;
+            return id;
         }
 
         private string PresetGroupLabel(int group) => group switch
@@ -1458,15 +1573,85 @@ namespace ReforgeHelper
             return string.Empty;
         }
 
-        private bool IsTarget(string internalName) =>
-            this.IsSlotTarget(internalName, string.Empty, string.Empty);
-
-        private bool IsSlotTarget(Slot slot) =>
-            this.IsSlotTarget(slot.InternalName, slot.Path, slot.DisplayName);
-
-        private bool IsSlotTarget(string internalName, string path, string displayName)
+        private void EnsureTargets()
         {
-            var target = this.Settings.TargetInternalName;
+            this.Settings.TargetInternalNames = ReforgeLogic.NormalizeTargets(
+                this.Settings.TargetInternalNames,
+                this.Settings.TargetInternalName);
+            this.Settings.TargetInternalName = string.Empty;
+        }
+
+        private bool AddTarget(string id)
+        {
+            this.EnsureTargets();
+            if (!ReforgeLogic.TryAddUnique(this.Settings.TargetInternalNames, id))
+            {
+                return false;
+            }
+
+            this.Log("目标 +" + this.TargetLabel(id));
+            return true;
+        }
+
+        private bool ListHas(string internalName)
+        {
+            foreach (var id in this.Settings.TargetInternalNames)
+            {
+                if (this.IsSlotTarget(id, internalName, string.Empty, string.Empty))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private int CountIdentified(string target)
+        {
+            var n = 0;
+            foreach (var slot in this.invSlots)
+            {
+                if (slot.Identified && this.IsSlotTarget(target, slot))
+                {
+                    n += ReforgeLogic.StackCount(true, slot.Stack);
+                }
+            }
+
+            return n;
+        }
+
+        private bool HasOccupiedWells()
+        {
+            foreach (var well in this.inputWells)
+            {
+                if (well.Occupied)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool NeedsDumpNonCurrent(string target)
+        {
+            foreach (var well in this.inputWells)
+            {
+                if (well.Occupied &&
+                    !this.IsSlotTarget(target, well.InternalName, well.Path, well.DisplayName))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool IsSlotTarget(string target, Slot slot) =>
+            this.IsSlotTarget(target, slot.InternalName, slot.Path, slot.DisplayName);
+
+        private bool IsSlotTarget(string target, string internalName, string path, string displayName)
+        {
             if (ReforgeLogic.Matches(target, internalName, path, displayName))
             {
                 return true;

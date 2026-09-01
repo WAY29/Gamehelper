@@ -1,5 +1,6 @@
 namespace ReforgeHelper
 {
+    using System.Collections.Generic;
     using ClickableTransparentOverlay.Win32;
     using GameHelper.Plugin;
 
@@ -22,5 +23,6 @@ namespace ReforgeHelper
         public bool ShowDebugWindow;
         public bool ShowLogWindow;
         public string TargetInternalName = string.Empty;
+        public List<string> TargetInternalNames = new();
     }
 }

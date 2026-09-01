@@ -93,6 +93,55 @@ namespace ReforgeHelper
 
         public static bool CanReforge(int total) => total >= 3;
 
+        public static bool IsExhausted(int wellTotal, int inventoryCount) =>
+            wellTotal + Math.Max(0, inventoryCount) < 3;
+
+        public static bool OccupiedIsCurrent(
+            bool occupied,
+            string target,
+            string internalName,
+            string path = "",
+            string displayName = "") =>
+            !occupied || Matches(target, internalName, path, displayName);
+
+        public static bool TryAddUnique(List<string> list, string id)
+        {
+            if (list == null || string.IsNullOrWhiteSpace(id))
+            {
+                return false;
+            }
+
+            foreach (var existing in list)
+            {
+                if (string.Equals(existing, id, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+
+            list.Add(id);
+            return true;
+        }
+
+        public static List<string> NormalizeTargets(IEnumerable<string>? names, string? legacy)
+        {
+            var list = new List<string>();
+            if (names != null)
+            {
+                foreach (var name in names)
+                {
+                    TryAddUnique(list, name);
+                }
+            }
+
+            if (list.Count == 0)
+            {
+                TryAddUnique(list, legacy ?? string.Empty);
+            }
+
+            return list;
+        }
+
         public static bool TryTakeUntil(IReadOnlyList<NamedPos> matches, int need, out NamedPos[] taken)
         {
             taken = [];
@@ -263,6 +312,42 @@ namespace ReforgeHelper
             if (CanReforge(2) || !CanReforge(3) || !CanReforge(10))
             {
                 throw new InvalidOperationException("reforge when total >= 3");
+            }
+
+            if (!IsExhausted(2, 0) || !IsExhausted(0, 2) || !IsExhausted(1, 1) ||
+                IsExhausted(2, 1) || IsExhausted(0, 3) || IsExhausted(3, 0))
+            {
+                throw new InvalidOperationException("exhausted when well+inventory < 3");
+            }
+
+            if (!OccupiedIsCurrent(false, "A", string.Empty) ||
+                !OccupiedIsCurrent(true, "A", "A") ||
+                OccupiedIsCurrent(true, "A", string.Empty) ||
+                OccupiedIsCurrent(true, "A", "B"))
+            {
+                throw new InvalidOperationException("empty well is current; occupied must match; unread is not current");
+            }
+
+            var targets = new List<string> { "A" };
+            if (TryAddUnique(targets, "A") ||
+                TryAddUnique(targets, "a") ||
+                TryAddUnique(targets, " ") ||
+                !TryAddUnique(targets, "B") ||
+                targets.Count != 2)
+            {
+                throw new InvalidOperationException("add unique InternalName, skip dup/empty");
+            }
+
+            var migrated = NormalizeTargets(null, "Old");
+            if (migrated.Count != 1 || migrated[0] != "Old")
+            {
+                throw new InvalidOperationException("empty list must migrate legacy target");
+            }
+
+            var kept = NormalizeTargets(new[] { "A", "", "A", "B" }, "Old");
+            if (kept.Count != 2 || kept[0] != "A" || kept[1] != "B")
+            {
+                throw new InvalidOperationException("non-empty list keeps order, skips dup/empty, ignores legacy");
             }
 
             if (!TryTakeUntil([], 0, out var none) || none.Length != 0)
